@@ -1,4 +1,3 @@
-use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 use crate::{

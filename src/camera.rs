@@ -1,14 +1,20 @@
 use crate::hittable::{HitRecord, Hittable, HittableList};
 use crate::interval::Interval;
 use crate::pixelbuffer;
-use crate::profiler::Profiler;
-use crate::random::{self, random_double};
+use crate::random::{self, random_double, random_int};
 use crate::ray::{degrees_to_radians, Ray};
-use crate::vector::{cross, random_in_unit_disk, random_unit_vector, Vec3};
-use rand::{Rng, SeedableRng};
+use crate::vector::{cross, random_in_unit_disk, Vec3};
 use rand_xorshift::XorShiftRng;
 
 const DEPTH_OF_FIELD: bool = false;
+const TAKE_AVERAGE: bool = false;
+const IN_BETWEEN_OPTIMIZATION: bool = true;
+const AVERAGE_CONTRAST: f64 = 0.2; // 0.0 for max contrast, 1.0 for least
+
+const SKY_TOP_COLOR: Vec3 = Vec3 { e: [0.0, 0.0, 0.0] };
+const SKY_BOTTOM_COLOR: Vec3 = Vec3 { e: [0.0, 0.05, 0.1] };
+
+const SAMPLES: i32 = 50;
 
 fn linear_to_gamma(linear_component: f64) -> f64 {
     linear_component.sqrt()
@@ -17,7 +23,6 @@ fn linear_to_gamma(linear_component: f64) -> f64 {
 #[derive(Clone)]
 pub struct Camera {
     pub pixel_buffer: Box<[u8]>,
-    pub pixel_buffer_2: Box<[u8]>,
     aspect_ratio: f64,
     camera_center: Vec3,
     pixel_delta_u: Vec3,
@@ -42,7 +47,6 @@ pub struct Camera {
 impl Camera {
     pub fn new() -> Self {
         let pixel_buffer: Box<[u8]> = pixelbuffer::new();
-        let pixel_buffer_2: Box<[u8]> = pixelbuffer::new();
 
         let aspect_ratio: f64 = (pixelbuffer::WIDTH as f64) / (pixelbuffer::HEIGHT as f64);
 
@@ -67,14 +71,13 @@ impl Camera {
 
         Camera {
             pixel_buffer: pixel_buffer,
-            pixel_buffer_2: pixel_buffer_2,
             aspect_ratio: aspect_ratio,
             camera_center: camera_center,
             pixel_delta_u: pixel_delta_u,
             pixel_delta_v: pixel_delta_v,
             upper_left_pixel_location: upper_left_pixel_location,
-            samples_per_pixel: 5,
-            max_depth: 4,
+            samples_per_pixel: SAMPLES,
+            max_depth: 10,
             lookat: Vec3::new(0.0, 0.0, -1.0),
             lookfrom: Vec3::new(0.0, 0.0, 0.0),
             vup: Vec3::new(0.0, 1.0, 0.0),
@@ -134,20 +137,208 @@ impl Camera {
         self.defocus_disk_v = self.v * defocus_radius;
     }
 
-    pub fn render(&mut self, world: &HittableList, rng: &mut XorShiftRng) {
+    /*pub fn render(&mut self, world: &HittableList, rng: &mut XorShiftRng) {
         self.initialize();
         for y in 0..pixelbuffer::HEIGHT {
             for x in 0..pixelbuffer::WIDTH {
-                // println!("Started pixel");
+                // Reset the pixel color
                 let mut pixel_color: Vec3 = Vec3::new(0.0, 0.0, 0.0);
+
+                // Render
                 for _sample in 0..self.samples_per_pixel {
                     let r = self.get_ray(x as i32, y as i32, rng);
                     pixel_color = pixel_color + self.ray_color(&r, self.max_depth, world, rng);
                 }
+
+                // Write color to screen
                 self.write_color(pixel_color, self.samples_per_pixel, x, y);
-                // println!("Finished pixel");
             }
         }
+    }*/
+
+    pub fn render(&mut self, world: &HittableList, rng: &mut XorShiftRng) {
+        self.initialize();
+        if !IN_BETWEEN_OPTIMIZATION {
+            self.render_screen_without_optimization(rng, world);
+        } else {
+            self.render_top_left(rng, world);
+            self.render_top_right(rng, world);
+            self.render_bottom_left(rng, world);
+            self.render_bottom_right(rng, world);
+        }
+    }
+
+    fn render_bottom_right(&mut self, rng: &mut XorShiftRng, world: &HittableList) {
+        for y in (1..pixelbuffer::HEIGHT).step_by(2) {
+            for x in (1..pixelbuffer::WIDTH).step_by(2) {
+                if x + 1 >= pixelbuffer::WIDTH {
+                    continue;
+                }
+                if y + 1 >= pixelbuffer::HEIGHT {
+                    continue;
+                }
+                self.render_average_4px(x, y, rng, world);
+            }
+        }
+    }
+
+    fn render_bottom_left(&mut self, rng: &mut XorShiftRng, world: &HittableList) {
+        for y in (1..pixelbuffer::HEIGHT).step_by(2) {
+            for x in (0..pixelbuffer::WIDTH).step_by(2) {
+                if x + 1 >= pixelbuffer::WIDTH {
+                    continue;
+                }
+                if y + 1 >= pixelbuffer::HEIGHT {
+                    continue;
+                }
+                self.render_average_2px(x, y, rng, world, 0, 1);
+            }
+        }
+    }
+
+    fn render_top_right(&mut self, rng: &mut XorShiftRng, world: &HittableList) {
+        for y in (0..pixelbuffer::HEIGHT).step_by(2) {
+            for x in (1..pixelbuffer::WIDTH).step_by(2) {
+                if x + 1 >= pixelbuffer::WIDTH {
+                    continue;
+                }
+                if y + 1 >= pixelbuffer::HEIGHT {
+                    continue;
+                }
+                self.render_average_2px(x, y, rng, world, 1, 0);
+            }
+        }
+    }
+
+    fn render_top_left(&mut self, rng: &mut XorShiftRng, world: &HittableList) {
+        for y in (0..pixelbuffer::HEIGHT).step_by(2) {
+            for x in (0..pixelbuffer::WIDTH).step_by(2) {
+                self.render_pixel(x, y, rng, world);
+            }
+        }
+    }
+
+    fn render_screen_without_optimization(&mut self, rng: &mut XorShiftRng, world: &HittableList) {
+        for y in 0..pixelbuffer::HEIGHT {
+            for x in 0..pixelbuffer::WIDTH {
+                self.render_pixel(x, y, rng, world);
+            }
+        }
+    }
+
+    fn render_average_4px(
+        &mut self,
+        x: usize,
+        y: usize,
+        rng: &mut XorShiftRng,
+        world: &HittableList,
+    ) {
+        let contrast = self.get_contrast_4px(x, y);
+        if contrast > AVERAGE_CONTRAST {
+            self.render_pixel(x, y, rng, world);
+            return;
+        }
+
+        let average: (u8, u8, u8);
+        let pix_left: (u8, u8, u8) = pixelbuffer::get_pixel(&self.pixel_buffer, x - 1, y - 1);
+        let pix_right: (u8, u8, u8) = pixelbuffer::get_pixel(&self.pixel_buffer, x + 1, y + 1);
+        let pix_left2: (u8, u8, u8) = pixelbuffer::get_pixel(&self.pixel_buffer, x - 1, y + 1);
+        let pix_right2: (u8, u8, u8) = pixelbuffer::get_pixel(&self.pixel_buffer, x + 1, y - 1);
+        if TAKE_AVERAGE {
+            average = pixelbuffer::average_tuple(
+                pixelbuffer::average_tuple(pix_left, pix_right),
+                pixelbuffer::average_tuple(pix_left2, pix_right2),
+            );
+        } else {
+            let random_sample = random_int(rng).abs() % 4;
+            match random_sample {
+                0 => average = pix_left,
+                1 => average = pix_left2,
+                2 => average = pix_right,
+                3 => average = pix_right2,
+                _ => panic!("Average random sampling 4px returned insane value"),
+            }
+        }
+        pixelbuffer::set(
+            &mut self.pixel_buffer,
+            x,
+            y,
+            average.0,
+            average.1,
+            average.2,
+        );
+    }
+
+    fn get_contrast_4px(&mut self, x: usize, y: usize) -> f64 {
+        f64::max(
+            pixelbuffer::get_contrast(&self.pixel_buffer, x - 1, y - 1, x + 1, y + 1),
+            pixelbuffer::get_contrast(&self.pixel_buffer, x - 1, y + 1, x + 1, y - 1),
+        )
+    }
+
+    fn render_average_2px(
+        &mut self,
+        x: usize,
+        y: usize,
+        rng: &mut XorShiftRng,
+        world: &HittableList,
+        shift_x: usize,
+        shift_y: usize,
+    ) {
+        let contrast = self.get_contrast_2px(shift_x, shift_y, x, y);
+        if contrast > AVERAGE_CONTRAST {
+            self.render_pixel(x, y, rng, world);
+            return;
+        }
+
+        let average: (u8, u8, u8);
+        let pix_left = pixelbuffer::get_pixel(&self.pixel_buffer, x - shift_x, y - shift_y);
+        let pix_right = pixelbuffer::get_pixel(&self.pixel_buffer, x + shift_x, y + shift_y);
+        if TAKE_AVERAGE {
+            average = pixelbuffer::average_tuple(pix_left, pix_right);
+        } else {
+            let random_sample = random_int(rng).abs() % 2;
+            match random_sample {
+                0 => average = pix_left,
+                1 => average = pix_right,
+                _ => panic!(
+                    "Average random sampling 2px returned insane value {}",
+                    random_sample
+                ),
+            }
+        }
+        pixelbuffer::set(
+            &mut self.pixel_buffer,
+            x,
+            y,
+            average.0,
+            average.1,
+            average.2,
+        );
+    }
+
+    fn get_contrast_2px(&mut self, shift_x: usize, shift_y: usize, x: usize, y: usize) -> f64 {
+        pixelbuffer::get_contrast(
+            &self.pixel_buffer,
+            x - shift_x,
+            y - shift_y,
+            x + shift_x,
+            y + shift_y,
+        )
+    }
+
+    fn render_pixel(&mut self, x: usize, y: usize, rng: &mut XorShiftRng, world: &HittableList) {
+        // Reset the pixel color
+        let mut pixel_color: Vec3 = Vec3::new(0.0, 0.0, 0.0);
+
+        // Render
+        for _sample in 0..self.samples_per_pixel {
+            let r = self.get_ray(x as i32, y as i32, rng);
+            pixel_color = pixel_color + self.ray_color(&r, self.max_depth, world, rng);
+        }
+
+        // Write color to screen
+        self.write_color(pixel_color, self.samples_per_pixel, x, y);
     }
 
     fn write_color(&mut self, color: Vec3, samples_per_pixel: i32, pixel_x: usize, pixel_y: usize) {
@@ -201,9 +392,6 @@ impl Camera {
             // Converting the ray's y position to between 0.0 and 1.0 in screen space
             let lerped_value = 0.5 * (unit_direction.y() + 1.0);
 
-            const SKY_TOP_COLOR: Vec3 = Vec3 { e: [0.0, 0.0, 0.0] };
-            const SKY_BOTTOM_COLOR: Vec3 = Vec3 { e: [0.0, 0.1, 0.3] };
-
             // Linear interpolation
             return (1.0 - lerped_value) * SKY_BOTTOM_COLOR + lerped_value * SKY_TOP_COLOR;
         }
@@ -213,7 +401,7 @@ impl Camera {
         let color_from_emission: Vec3 = temp_hit_record.material.emitted(
             temp_hit_record.u,
             temp_hit_record.v,
-            &temp_hit_record.point
+            &temp_hit_record.point,
         );
 
         if !temp_hit_record.material.scatter(

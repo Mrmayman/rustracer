@@ -9,18 +9,16 @@ extern crate sdl2;
 use bvh::BvhNode;
 use camera::Camera;
 use hittable::{HittableList, Sphere};
-use material::{Dielectric, Lambertian, Material, Metal};
-use profiler::Profiler;
+use material::{Lambertian, Metal};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 // use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
-use texture::{CheckerTexture, SolidColor, Texture};
 // use std::fmt;
 use crate::{hittable::Quad, texture::ImageTexture, vector::Vec3, material::DiffuseLight};
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 use std::time::Instant;
 
@@ -65,42 +63,14 @@ fn main() {
     let mut event_pump: sdl2::EventPump = sdl_context.event_pump().unwrap();
     let mut quit: bool = false;
 
-    let start_time: Instant = Instant::now();
+    // let start_time: Instant = Instant::now();
 
     let mut rng = XorShiftRng::from_seed([
         0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
         0x88,
     ]);
 
-    // Set up raytracer.
-    let mut world: HittableList = HittableList::new();
-    world.add(Box::new(Quad::new(
-        Vec3::new(0.0, 0.0, -1.0),
-        Vec3::new(1.0, 0.0, 0.0),
-        Vec3::new(0.0, 1.0, 0.0),
-        Box::new(DiffuseLight::new_color(Vec3::new(1.0, 1.0, 1.0)))
-    )));
-    world.add(Box::new(Sphere::new(
-        Vec3::new(1.0, 0.0, -1.0),
-        0.5,
-        Box::new(Metal::new(&Vec3::new(0.0, 0.3, 0.7), 0.0)),
-    )));
-    /*world.add(Box::new(Sphere::new(
-        Vec3::new(0.0, -100.5, -1.0),
-        100.0,
-        Box::new(Lambertian::new_texture(Box::new(
-            ImageTexture::new(&(current_path + "earthmap.png")).expect("Could not load image")
-        ))),
-    )));*/
-    world.add(Box::new(Sphere::new(
-        Vec3::new(0.0, -100.5, -1.0),
-        100.0,
-        Box::new(Lambertian::new_texture(Box::new(
-            ImageTexture::new(&(current_path + "earthmap.png")).expect("Could not load image"),
-        ))),
-    )));
-
-    world = HittableList::new_add(Box::new(BvhNode::new_list(&world, &mut rng)));
+    let mut world = init_world(current_path, &mut rng);
 
     let mut camera: Camera = Camera::new();
 
@@ -115,68 +85,19 @@ fn main() {
     let mut mouse_x = 0;
     let mut mouse_y = 0;
 
-    let mut prof: Profiler = Profiler::new();
+    // let mut prof: Profiler = Profiler::new();
 
     println!("Starting render");
 
     // Main loop.
     while !quit {
-        prof.start("Main loop");
-        prof.start("SDL2 Input events");
-        mouse_x = 0;
-        mouse_y = 0;
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. } => quit = true,
-                Event::MouseButtonDown { mouse_btn, .. } => {
-                    // Lock the mouse when any mouse button is clicked
-                    mouse_locked = true;
-                    sdl_context.mouse().set_relative_mouse_mode(true);
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => {
-                    // Unlock the mouse when the Escape key is pressed
-                    mouse_locked = false;
-                    sdl_context.mouse().set_relative_mouse_mode(false);
-                }
-                Event::MouseMotion {
-                    x, y, xrel, yrel, ..
-                } => {
-                    mouse_x = xrel;
-                    mouse_y = yrel;
-                }
-                _ => {}
-            }
-        }
+        handle_events(&mut mouse_x, &mut mouse_y, &mut event_pump, &mut quit, &mut mouse_locked, &sdl_context);
 
-        if !mouse_locked {
-            mouse_x = 0;
-            mouse_y = 0;
-        }
-
-        prof.end("SDL2 Input events");
-
-        // println!("{}, {}", mouse_x, mouse_y);
-
-        // Main rendering
-        prof.start("Rendering");
-        let elapsed_time = start_time.elapsed().as_secs_f32();
-        // println!("Started frame");
         camera.render(&mut world, &mut rng);
-        // println!("Finished frame");
-        prof.end("Rendering");
 
-        // println!("Rendered frame. Second : {}", elapsed_time);
-
-        prof.start("Screen Update");
         update_screen(&mut texture, &camera, &mut canvas);
-        prof.end("Screen Update");
-
-        prof.start("Movement");
-        let delta_time: f64 = delta_start_time.elapsed().as_millis() as f64 / 16.0;
-        delta_start_time = Instant::now();
+        
+        let delta_time = calculate_delta_time(&mut delta_start_time);
 
         move_player(
             &mut camera_rotation,
@@ -187,13 +108,75 @@ fn main() {
             &mouse_y,
         );
 
-        prof.end("Movement");
-
         println!("{} FPS", 62.5 / delta_time);
-        prof.end("Main loop");
-        prof.finish();
-        // quit = true;
     }
+}
+
+fn handle_events(mouse_x: &mut i32, mouse_y: &mut i32, event_pump: &mut sdl2::EventPump, quit: &mut bool, mouse_locked: &mut bool, sdl_context: &sdl2::Sdl) {
+    *mouse_x = 0;
+    *mouse_y = 0;
+    for event in event_pump.poll_iter() {
+        match event {
+            Event::Quit { .. } => *quit = true,
+            Event::MouseButtonDown { mouse_btn, .. } => {
+                // Lock the mouse when any mouse button is clicked
+                *mouse_locked = true;
+                sdl_context.mouse().set_relative_mouse_mode(true);
+            }
+            Event::KeyDown {
+                keycode: Some(Keycode::Escape),
+                ..
+            } => {
+                // Unlock the mouse when the Escape key is pressed
+                *mouse_locked = false;
+                sdl_context.mouse().set_relative_mouse_mode(false);
+            }
+            Event::MouseMotion {
+                x, y, xrel, yrel, ..
+            } => {
+                *mouse_x = xrel;
+                *mouse_y = yrel;
+            }
+            _ => {}
+        }
+    }
+
+    if !*mouse_locked {
+        *mouse_x = 0;
+        *mouse_y = 0;
+    }
+}
+
+fn calculate_delta_time(delta_start_time: &mut Instant) -> f64 {
+    let delta_time: f64 = delta_start_time.elapsed().as_millis() as f64 / 16.0;
+    *delta_start_time = Instant::now();
+    delta_time
+}
+
+fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
+    // Set up raytracer.
+    let mut world: HittableList = HittableList::new();
+    world.add(Box::new(Quad::new(
+        Vec3::new(0.0, 0.0, -1.0),
+        Vec3::new(1.0, 0.0, 0.0),
+        Vec3::new(0.0, 1.0, 0.0),
+        Box::new(DiffuseLight::new_color(Vec3::new(1.0, 1.0, 1.0)))
+    )));
+    world.add(Box::new(Sphere::new(
+        Vec3::new(1.0, 0.0, -1.0),
+        0.5,
+        Box::new(Metal::new(&Vec3::new(0.0, 0.3, 0.7), 0.0)),
+    )));
+    world.add(Box::new(Sphere::new(
+        Vec3::new(0.0, -100.5, -1.0),
+        100.0,
+        Box::new(Lambertian::new_texture(Box::new(
+            ImageTexture::new(&(current_path + "earthmap.png")).expect("Could not load image"),
+        ))),
+    )));
+
+    world = HittableList::new_add(Box::new(BvhNode::new_list(&world, rng)));
+    world
 }
 
 fn move_player(

@@ -1,4 +1,4 @@
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 use rand_xorshift::XorShiftRng;
 
 // Utility Functions
@@ -15,16 +15,29 @@ pub fn random_double_range(min: f64, max: f64, rng: &mut XorShiftRng) -> f64 {
 
 pub fn random_int(rng: &mut XorShiftRng) -> i32 {
     // Returns a random integer in [0, i32::MAX].
-    let mut rng = XorShiftRng::from_seed([69; 16]);
     rng.gen::<i32>()
 }
 
 pub fn random_int_range(min: i32, max: i32, rng: &mut XorShiftRng) -> i32 {
-    // Returns a random integer in [min, max).
+    // Ensure that min and max define a valid range
     if min >= max {
-        return min; // Return min if min is greater than or equal to max.
+        return min;
     }
-    min + random_int(rng) % (max - min)
+
+    // Generate a random integer within the range [min, max).
+    // We're using the full range of i32 values here.
+    let random_value = rng.gen::<i32>();
+    let range = (max - min) as i64;
+    let result = (random_value as i64 % range) + min as i64;
+
+    // Ensure the result fits within the i32 range and return it.
+    if result > i32::MAX as i64 {
+        return i32::MAX;
+    } else if result < i32::MIN as i64 {
+        return i32::MIN;
+    }
+
+    result as i32
 }
 
 fn days_since_2000() -> f64 {

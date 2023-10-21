@@ -1,11 +1,10 @@
-use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 use crate::{
     hittable::HitRecord,
     random::random_double,
     ray::Ray,
-    texture::{self, SolidColor, Texture},
+    texture::{SolidColor, Texture},
     vector::{dot, random_unit_vector, reflect, refract, Vec3},
 };
 

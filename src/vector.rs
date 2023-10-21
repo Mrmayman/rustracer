@@ -1,4 +1,3 @@
-use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 use std::fmt;
 use std::ops::{Add, Div, Mul, Sub};
