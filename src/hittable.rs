@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     aabb::AABB,
     interval::Interval,
@@ -12,7 +14,7 @@ pub struct HitRecord {
     pub normal: Vec3,
     pub t: f64,
     pub front_face: bool,
-    pub material: Box<dyn Material>,
+    pub material: Rc<dyn Material>,
     pub u: f64,
     pub v: f64,
 }
@@ -24,7 +26,7 @@ impl HitRecord {
             normal: Vec3::new(0.0, 0.0, 0.0),
             t: 0.0,
             front_face: true,
-            material: Box::new(Lambertian::new_color(&Vec3::new(0.0, 0.0, 0.0))),
+            material: Rc::new(Lambertian::new_color(&Vec3::new(0.0, 0.0, 0.0))),
             u: 0.0,
             v: 0.0,
         }
@@ -47,7 +49,7 @@ impl HitRecord {
             normal: self.normal,
             t: self.t,
             front_face: self.front_face,
-            material: (*self.material).clone_custom(),
+            material: self.material.clone(),
             u: self.u,
             v: self.v,
         }
@@ -57,18 +59,17 @@ impl HitRecord {
 pub trait Hittable {
     fn hit(&self, hit_ray: &Ray, ray_t: Interval, hit_record: &mut HitRecord) -> bool;
     fn bounding_box(&self) -> AABB;
-    fn clone_custom(&self) -> Box<dyn Hittable>;
 }
 
 pub struct Sphere {
     center: Vec3,
     radius: f64,
-    material: Box<dyn Material>,
+    material: Rc<dyn Material>,
     bbox: AABB,
 }
 
 impl Sphere {
-    pub fn new(center: Vec3, radius: f64, material: Box<dyn Material>) -> Self {
+    pub fn new(center: Vec3, radius: f64, material: Rc<dyn Material>) -> Self {
         let rvec = Vec3::new(radius, radius, radius);
         Sphere {
             center: center,
@@ -130,7 +131,7 @@ impl Hittable for Sphere {
         // hit_record.v = 0.0;
         Sphere::get_sphere_uv(&outward_normal, &mut hit_record.u, &mut hit_record.v);
         // println!("{}", hit_record.u);
-        hit_record.material = self.material.clone_custom();
+        hit_record.material = self.material.clone();
 
         return true;
     }
@@ -138,19 +139,10 @@ impl Hittable for Sphere {
     fn bounding_box(&self) -> AABB {
         self.bbox.clone()
     }
-
-    fn clone_custom(&self) -> Box<dyn Hittable> {
-        Box::new(Sphere {
-            center: self.center,
-            radius: self.radius,
-            material: self.material.clone_custom(),
-            bbox: self.bbox.clone(),
-        })
-    }
 }
 
 pub struct HittableList {
-    pub objects: Vec<Box<dyn Hittable>>,
+    pub objects: Vec<Rc<dyn Hittable>>,
     bbox: AABB,
 }
 
@@ -162,7 +154,7 @@ impl HittableList {
         }
     }
 
-    pub fn new_add(object: Box<dyn Hittable>) -> HittableList {
+    pub fn new_add(object: Rc<dyn Hittable>) -> HittableList {
         let mut temp_list = HittableList {
             objects: Vec::new(),
             bbox: AABB::new(),
@@ -171,16 +163,9 @@ impl HittableList {
         temp_list
     }
 
-    pub fn add(&mut self, object: Box<dyn Hittable>) {
+    pub fn add(&mut self, object: Rc<dyn Hittable>) {
         self.bbox = AABB::new_aabb(&self.bbox, &object.bounding_box());
         self.objects.push(object);
-    }
-
-    fn manual_clone_vec_custom(original_vec: &Vec<Box<dyn Hittable>>) -> Vec<Box<dyn Hittable>> {
-        original_vec
-            .iter()
-            .map(|item| item.clone_custom())
-            .collect()
     }
 }
 
@@ -212,20 +197,13 @@ impl Hittable for HittableList {
     fn bounding_box(&self) -> AABB {
         self.bbox.clone()
     }
-
-    fn clone_custom(&self) -> Box<dyn Hittable> {
-        Box::new(HittableList {
-            objects: HittableList::manual_clone_vec_custom(&self.objects),
-            bbox: self.bbox.clone(),
-        })
-    }
 }
 
 pub struct Quad {
     q: Vec3,
     u: Vec3,
     v: Vec3,
-    mat: Box<dyn Material>,
+    mat: Rc<dyn Material>,
     bbox: AABB,
     normal: Vec3,
     d: f64,
@@ -260,7 +238,7 @@ impl Hittable for Quad {
         // Ray hits the 2D shape; set the rest of the hit record and return true.
         hit_record.t = t;
         hit_record.point = intersection;
-        hit_record.material = self.mat.clone_custom();
+        hit_record.material = self.mat.clone();
         hit_record.set_face_normal(hit_ray, &self.normal);
 
         true
@@ -269,19 +247,6 @@ impl Hittable for Quad {
     fn bounding_box(&self) -> AABB {
         self.bbox.clone()
     }
-
-    fn clone_custom(&self) -> Box<dyn Hittable> {
-        Box::new(Quad {
-            q: self.q,
-            u: self.u,
-            v: self.v,
-            mat: self.mat.clone_custom(),
-            bbox: self.bbox.clone(),
-            normal: self.normal,
-            d: self.d,
-            w: self.w,
-        })
-    }
 }
 
 impl Quad {
@@ -289,7 +254,7 @@ impl Quad {
         self.bbox = AABB::new_point(&self.q, &(self.q + self.u + self.v)).pad();
     }
 
-    pub fn new(q: Vec3, u: Vec3, v: Vec3, mat: Box<dyn Material>) -> Quad {
+    pub fn new(q: Vec3, u: Vec3, v: Vec3, mat: Rc<dyn Material>) -> Quad {
         let n = cross(u, v);
         let normal = n.unit_vector();
         let mut temp_quad = Quad {

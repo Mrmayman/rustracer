@@ -1,11 +1,11 @@
 use crate::vector::Vec3;
 use image::GenericImageView;
 use std::path::Path;
+use std::rc::Rc;
 use std::sync::Arc;
 
 pub trait Texture {
     fn value(&self, u: f64, v: f64, p: &Vec3) -> Vec3;
-    fn clone_custom(&self) -> Box<dyn Texture>;
 }
 
 pub struct SolidColor {
@@ -15,10 +15,6 @@ pub struct SolidColor {
 impl Texture for SolidColor {
     fn value(&self, u: f64, v: f64, p: &Vec3) -> Vec3 {
         self.color_value
-    }
-
-    fn clone_custom(&self) -> Box<dyn Texture> {
-        Box::new(SolidColor::new(&self.color_value))
     }
 }
 
@@ -32,8 +28,8 @@ impl SolidColor {
 
 pub struct CheckerTexture {
     scale: f64,
-    even: Box<dyn Texture>,
-    odd: Box<dyn Texture>,
+    even: Rc<dyn Texture>,
+    odd: Rc<dyn Texture>,
 }
 
 impl Texture for CheckerTexture {
@@ -55,18 +51,10 @@ impl Texture for CheckerTexture {
             return self.odd.value(u, v, p);
         }
     }
-
-    fn clone_custom(&self) -> Box<dyn Texture> {
-        Box::new(CheckerTexture::new(
-            self.scale,
-            self.even.clone_custom(),
-            self.odd.clone_custom(),
-        ))
-    }
 }
 
 impl CheckerTexture {
-    pub fn new(scale: f64, even: Box<dyn Texture>, odd: Box<dyn Texture>) -> CheckerTexture {
+    pub fn new(scale: f64, even: Rc<dyn Texture>, odd: Rc<dyn Texture>) -> CheckerTexture {
         CheckerTexture {
             scale: scale,
             even: even,
@@ -77,8 +65,8 @@ impl CheckerTexture {
     pub fn new_color(scale: f64, even: &Vec3, odd: &Vec3) -> CheckerTexture {
         CheckerTexture {
             scale: scale,
-            even: Box::new(SolidColor::new(even)),
-            odd: Box::new(SolidColor::new(odd)),
+            even: Rc::new(SolidColor::new(even)),
+            odd: Rc::new(SolidColor::new(odd)),
         }
     }
 }
@@ -97,14 +85,6 @@ impl Texture for ImageTexture {
         )
         .expect("Could not access pixel in image texture")
         // Vec3::new(0.0, 1.0, 0.0)
-    }
-
-    fn clone_custom(&self) -> Box<dyn Texture> {
-        Box::new(ImageTexture {
-            data: self.data.clone(),
-            width: self.width,
-            height: self.height,
-        })
     }
 }
 

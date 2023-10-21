@@ -20,7 +20,7 @@ use sdl2::video::Window;
 use crate::{hittable::Quad, texture::ImageTexture, vector::Vec3, material::DiffuseLight};
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
-use std::time::Instant;
+use std::{time::Instant, rc::Rc};
 
 const SCREEN_WIDTH: u32 = 800;
 const SCREEN_HEIGHT: u32 = 600;
@@ -156,26 +156,26 @@ fn calculate_delta_time(delta_start_time: &mut Instant) -> f64 {
 fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     // Set up raytracer.
     let mut world: HittableList = HittableList::new();
-    world.add(Box::new(Quad::new(
+    world.add(Rc::new(Quad::new(
         Vec3::new(0.0, 0.0, -1.0),
         Vec3::new(1.0, 0.0, 0.0),
         Vec3::new(0.0, 1.0, 0.0),
-        Box::new(DiffuseLight::new_color(Vec3::new(1.0, 1.0, 1.0)))
+        Rc::new(DiffuseLight::new_color(Vec3::new(1.0, 1.0, 1.0)))
     )));
-    world.add(Box::new(Sphere::new(
+    world.add(Rc::new(Sphere::new(
         Vec3::new(1.0, 0.0, -1.0),
         0.5,
-        Box::new(Metal::new(&Vec3::new(0.0, 0.3, 0.7), 0.0)),
+        Rc::new(Metal::new(&Vec3::new(0.0, 0.3, 0.7), 0.0)),
     )));
-    world.add(Box::new(Sphere::new(
+    world.add(Rc::new(Sphere::new(
         Vec3::new(0.0, -100.5, -1.0),
         100.0,
-        Box::new(Lambertian::new_texture(Box::new(
+        Rc::new(Lambertian::new_texture(Rc::new(
             ImageTexture::new(&(current_path + "earthmap.png")).expect("Could not load image"),
         ))),
     )));
 
-    world = HittableList::new_add(Box::new(BvhNode::new_list(&world, rng)));
+    world = HittableList::new_add(Rc::new(BvhNode::new_list(&world, rng)));
     world
 }
 

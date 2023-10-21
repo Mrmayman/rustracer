@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use rand_xorshift::XorShiftRng;
 
 use crate::{
@@ -17,12 +19,11 @@ pub trait Material {
         scattered: &mut Ray,
         rng: &mut XorShiftRng,
     ) -> bool;
-    fn clone_custom(&self) -> Box<dyn Material>;
     fn emitted(&self, u: f64, v: f64, p: &Vec3) -> Vec3;
 }
 
 pub struct Lambertian {
-    albedo: Box<dyn Texture>,
+    albedo: Rc<dyn Texture>,
 }
 
 impl Material for Lambertian {
@@ -47,13 +48,6 @@ impl Material for Lambertian {
         return true;
     }
 
-    fn clone_custom(&self) -> Box<dyn Material> {
-        let temp: Box<dyn Material> = Box::new(Lambertian {
-            albedo: self.albedo.clone_custom(),
-        });
-        temp
-    }
-
     fn emitted(&self, u: f64, v: f64, p: &Vec3) -> Vec3 {
         Vec3::new_default()
     }
@@ -62,11 +56,11 @@ impl Material for Lambertian {
 impl Lambertian {
     pub fn new_color(color: &Vec3) -> Lambertian {
         Lambertian {
-            albedo: Box::new(SolidColor::new(color)),
+            albedo: Rc::new(SolidColor::new(color)),
         }
     }
 
-    pub fn new_texture(texture: Box<dyn Texture>) -> Lambertian {
+    pub fn new_texture(texture: Rc<dyn Texture>) -> Lambertian {
         Lambertian { albedo: texture }
     }
 }
@@ -93,11 +87,6 @@ impl Material for Metal {
         );
         *attenuation = self.albedo;
         return dot(&scattered.direction(), &hit_record.normal) > 0.0;
-    }
-
-    fn clone_custom(&self) -> Box<dyn Material> {
-        let temp: Box<dyn Material> = Box::new(Metal::new(&self.albedo, self.fuzziness));
-        temp
     }
 
     fn emitted(&self, u: f64, v: f64, p: &Vec3) -> Vec3 {
@@ -153,12 +142,6 @@ impl Material for Dielectric {
         return true;
     }
 
-    fn clone_custom(&self) -> Box<dyn Material> {
-        Box::new(Dielectric {
-            index_of_refraction: self.index_of_refraction,
-        })
-    }
-
     fn emitted(&self, u: f64, v: f64, p: &Vec3) -> Vec3 {
         Vec3::new_default()
     }
@@ -180,7 +163,7 @@ impl Dielectric {
 }
 
 pub struct DiffuseLight {
-    emit: Box<dyn Texture>,
+    emit: Rc<dyn Texture>,
 }
 
 impl Material for DiffuseLight {
@@ -195,23 +178,17 @@ impl Material for DiffuseLight {
         false
     }
 
-    fn clone_custom(&self) -> Box<dyn Material> {
-        Box::new(DiffuseLight {
-            emit: self.emit.clone_custom(),
-        })
-    }
-
     fn emitted(&self, u: f64, v: f64, p: &Vec3) -> Vec3 {
         self.emit.value(u, v, p)
     }
 }
 
 impl DiffuseLight {
-    pub fn new_texture(texture: Box<dyn Texture>) -> DiffuseLight {
+    pub fn new_texture(texture: Rc<dyn Texture>) -> DiffuseLight {
         DiffuseLight { emit: texture }
     }
 
     pub fn new_color(color: Vec3) -> DiffuseLight {
-        DiffuseLight { emit: Box::new(SolidColor::new(&color)) }
+        DiffuseLight { emit: Rc::new(SolidColor::new(&color)) }
     }
 }
