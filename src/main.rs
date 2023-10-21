@@ -10,7 +10,7 @@ use bvh::BvhNode;
 use camera::Camera;
 use hittable::{HittableList, RotateY, Sphere, Translate};
 use material::{Lambertian, Metal};
-use sdl2::event::Event;
+use sdl2::event::{self, Event};
 use sdl2::keyboard::Keycode;
 // use sdl2::pixels::Color;
 use sdl2::rect::Rect;
@@ -20,6 +20,7 @@ use sdl2::video::Window;
 use crate::{hittable::Quad, material::DiffuseLight, texture::ImageTexture, vector::Vec3};
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
+use std::collections::HashSet;
 use std::{rc::Rc, time::Instant};
 
 const SCREEN_WIDTH: u32 = 800;
@@ -113,7 +114,7 @@ fn main() {
             delta_time,
             &mouse_x,
             &mouse_y,
-            &mut world
+            &mut world,
         );
 
         println!("{} FPS", 62.5 / delta_time);
@@ -361,10 +362,13 @@ fn move_player(
     let camera_rot_y: f64 = camera_rotation.1 * (std::f64::consts::PI / 180.0);
     // println!("{}, {}", camera_rotation.0, camera_rot_x);
 
-    if event_pump
+    let pressed: HashSet<Keycode> = event_pump
         .keyboard_state()
-        .is_scancode_pressed(sdl2::keyboard::Scancode::W)
-    {
+        .pressed_scancodes()
+        .filter_map(Keycode::from_scancode)
+        .collect();
+
+    if pressed.contains(&sdl2::keyboard::Keycode::W) {
         camera
             .lookfrom
             .setz(camera.lookfrom.z() - (MOVE_SPEED * delta_time * camera_rot_x.cos()));
@@ -372,10 +376,7 @@ fn move_player(
             .lookfrom
             .setx(camera.lookfrom.x() + (MOVE_SPEED * delta_time * camera_rot_x.sin()));
     }
-    if event_pump
-        .keyboard_state()
-        .is_scancode_pressed(sdl2::keyboard::Scancode::S)
-    {
+    if pressed.contains(&sdl2::keyboard::Keycode::S) {
         camera
             .lookfrom
             .setz(camera.lookfrom.z() + (MOVE_SPEED * delta_time * camera_rot_x.cos()));
@@ -383,10 +384,7 @@ fn move_player(
             .lookfrom
             .setx(camera.lookfrom.x() - (MOVE_SPEED * delta_time * camera_rot_x.sin()));
     }
-    if event_pump
-        .keyboard_state()
-        .is_scancode_pressed(sdl2::keyboard::Scancode::A)
-    {
+    if pressed.contains(&sdl2::keyboard::Keycode::A) {
         camera
             .lookfrom
             .setz(camera.lookfrom.z() - (MOVE_SPEED * delta_time * camera_rot_x.sin()));
@@ -394,10 +392,7 @@ fn move_player(
             .lookfrom
             .setx(camera.lookfrom.x() - (MOVE_SPEED * delta_time * camera_rot_x.cos()));
     }
-    if event_pump
-        .keyboard_state()
-        .is_scancode_pressed(sdl2::keyboard::Scancode::D)
-    {
+    if pressed.contains(&sdl2::keyboard::Keycode::D) {
         camera
             .lookfrom
             .setz(camera.lookfrom.z() + (MOVE_SPEED * delta_time * camera_rot_x.sin()));
@@ -405,18 +400,12 @@ fn move_player(
             .lookfrom
             .setx(camera.lookfrom.x() + (MOVE_SPEED * delta_time * camera_rot_x.cos()));
     }
-    if event_pump
-        .keyboard_state()
-        .is_scancode_pressed(sdl2::keyboard::Scancode::Space)
-    {
+    if pressed.contains(&sdl2::keyboard::Keycode::Space) {
         camera
             .lookfrom
             .sety(camera.lookfrom.y() + (MOVE_SPEED * delta_time));
     }
-    if event_pump
-        .keyboard_state()
-        .is_scancode_pressed(sdl2::keyboard::Scancode::LShift)
-    {
+    if pressed.contains(&sdl2::keyboard::Keycode::LShift) {
         camera
             .lookfrom
             .sety(camera.lookfrom.y() - (MOVE_SPEED * delta_time));
