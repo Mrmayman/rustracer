@@ -11,10 +11,13 @@ const TAKE_AVERAGE: bool = false;
 const IN_BETWEEN_OPTIMIZATION: bool = true;
 const AVERAGE_CONTRAST: f64 = 0.2; // 0.0 for max contrast, 1.0 for least
 
-const SKY_TOP_COLOR: Vec3 = Vec3 { e: [0.0, 0.0, 0.0] };
-const SKY_BOTTOM_COLOR: Vec3 = Vec3 { e: [0.0, 0.05, 0.1] };
+// const SKY_TOP_COLOR: Vec3 = Vec3 { e: [0.0, 0.0, 0.0] };
+// const SKY_BOTTOM_COLOR: Vec3 = Vec3 { e: [0.0, 0.05, 0.1] };
 
-const SAMPLES: i32 = 40;
+const SKY_TOP_COLOR: Vec3 = Vec3 { e: [0.3, 0.7, 1.0] };
+const SKY_BOTTOM_COLOR: Vec3 = Vec3 { e: [0.4, 0.8, 1.0] };
+
+const SAMPLES: i32 = 10;
 
 fn linear_to_gamma(linear_component: f64) -> f64 {
     linear_component.sqrt()

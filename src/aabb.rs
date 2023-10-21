@@ -2,9 +2,9 @@ use crate::{interval::Interval, ray::Ray, vector::Vec3};
 
 #[derive(Clone)]
 pub struct AABB {
-    x: Interval,
-    y: Interval,
-    z: Interval,
+    pub x: Interval,
+    pub y: Interval,
+    pub z: Interval,
 }
 
 impl AABB {

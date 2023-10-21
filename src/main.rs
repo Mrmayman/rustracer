@@ -8,7 +8,7 @@ extern crate sdl2;
 
 use bvh::BvhNode;
 use camera::Camera;
-use hittable::{HittableList, Sphere};
+use hittable::{HittableList, RotateY, Sphere, Translate};
 use material::{Lambertian, Metal};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -17,10 +17,10 @@ use sdl2::rect::Rect;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
 // use std::fmt;
-use crate::{hittable::Quad, texture::ImageTexture, vector::Vec3, material::DiffuseLight};
+use crate::{hittable::Quad, material::DiffuseLight, texture::ImageTexture, vector::Vec3};
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
-use std::{time::Instant, rc::Rc};
+use std::{rc::Rc, time::Instant};
 
 const SCREEN_WIDTH: u32 = 800;
 const SCREEN_HEIGHT: u32 = 600;
@@ -74,7 +74,7 @@ fn main() {
 
     let mut camera: Camera = Camera::new();
 
-    camera.lookfrom = Vec3::new(-2.0, 2.0, 1.0);
+    camera.lookfrom = Vec3::new(0.0, 2.0, 0.0);
     camera.lookat = Vec3::new(0.0, 0.0, -1.0);
 
     let mut delta_start_time: Instant = Instant::now();
@@ -91,12 +91,19 @@ fn main() {
 
     // Main loop.
     while !quit {
-        handle_events(&mut mouse_x, &mut mouse_y, &mut event_pump, &mut quit, &mut mouse_locked, &sdl_context);
+        handle_events(
+            &mut mouse_x,
+            &mut mouse_y,
+            &mut event_pump,
+            &mut quit,
+            &mut mouse_locked,
+            &sdl_context,
+        );
 
         camera.render(&mut world, &mut rng);
 
         update_screen(&mut texture, &camera, &mut canvas);
-        
+
         let delta_time = calculate_delta_time(&mut delta_start_time);
 
         move_player(
@@ -112,7 +119,14 @@ fn main() {
     }
 }
 
-fn handle_events(mouse_x: &mut i32, mouse_y: &mut i32, event_pump: &mut sdl2::EventPump, quit: &mut bool, mouse_locked: &mut bool, sdl_context: &sdl2::Sdl) {
+fn handle_events(
+    mouse_x: &mut i32,
+    mouse_y: &mut i32,
+    event_pump: &mut sdl2::EventPump,
+    quit: &mut bool,
+    mouse_locked: &mut bool,
+    sdl_context: &sdl2::Sdl,
+) {
     *mouse_x = 0;
     *mouse_y = 0;
     for event in event_pump.poll_iter() {
@@ -154,28 +168,177 @@ fn calculate_delta_time(delta_start_time: &mut Instant) -> f64 {
 }
 
 fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
-    // Set up raytracer.
+    // Add stuff to world
     let mut world: HittableList = HittableList::new();
-    world.add(Rc::new(Quad::new(
-        Vec3::new(0.0, 0.0, -1.0),
-        Vec3::new(1.0, 0.0, 0.0),
-        Vec3::new(0.0, 1.0, 0.0),
-        Rc::new(DiffuseLight::new_color(Vec3::new(1.0, 1.0, 1.0)))
-    )));
-    world.add(Rc::new(Sphere::new(
-        Vec3::new(1.0, 0.0, -1.0),
-        0.5,
-        Rc::new(Metal::new(&Vec3::new(0.0, 0.3, 0.7), 0.0)),
-    )));
-    world.add(Rc::new(Sphere::new(
-        Vec3::new(0.0, -100.5, -1.0),
-        100.0,
+
+    let road1 = Rc::new(Quad::new(
+        Vec3::new(-5.0, 0.0, -5.0),
+        Vec3::new(10.0, 0.0, 0.0),
+        Vec3::new(0.0, 0.0, 10.0),
         Rc::new(Lambertian::new_texture(Rc::new(
-            ImageTexture::new(&(current_path + "earthmap.png")).expect("Could not load image"),
+            ImageTexture::new(&(current_path + "road.png")).expect("Could not load image"),
         ))),
-    )));
+    ));
+    world.add(Rc::new(RotateY::new(road1, 0.0)));
 
     world = HittableList::new_add(Rc::new(BvhNode::new_list(&world, rng)));
+
+    let car_color = Vec3::new(1.0, 0.2, 0.1);
+
+    // Car top
+    world.add(Rc::new(Translate::new(
+        Rc::new(RotateY::new(
+            Rc::new(Quad::new(
+                Vec3::new(0.8, 1.0, -1.0),
+                Vec3::new(-1.6, 0.0, 0.0),
+                Vec3::new(0.0, 0.0, 2.0),
+                Rc::new(Metal::new(&car_color, 0.2)),
+            )),
+            0.0,
+        )),
+        Vec3::new(0.0, 0.0, 5.0),
+    )));
+
+    // Car back glass
+    world.add(Rc::new(Translate::new(
+        Rc::new(RotateY::new(
+            Rc::new(Quad::new(
+                Vec3::new(0.8, 0.6, -2.0),
+                Vec3::new(-1.6, 0.0, 0.0),
+                Vec3::new(0.0, 0.4, 1.0),
+                Rc::new(Metal::new(&Vec3::new(0.0, 0.0, 0.0), 0.2)),
+            )),
+            0.0,
+        )),
+        Vec3::new(0.0, 0.0, 5.0),
+    )));
+
+    // Car back top
+    world.add(Rc::new(Translate::new(
+        Rc::new(RotateY::new(
+            Rc::new(Quad::new(
+                Vec3::new(1.0, 0.6, -2.5),
+                Vec3::new(-2.0, 0.0, 0.0),
+                Vec3::new(0.0, 0.1, 1.5),
+                Rc::new(Metal::new(&car_color, 0.2)),
+            )),
+            0.0,
+        )),
+        Vec3::new(0.0, 0.0, 5.0),
+    )));
+
+    // Car back back
+    world.add(Rc::new(Translate::new(
+        Rc::new(RotateY::new(
+            Rc::new(Quad::new(
+                Vec3::new(1.0, 0.05, -2.7),
+                Vec3::new(-2.0, 0.0, 0.0),
+                Vec3::new(0.0, 0.55, 0.2),
+                Rc::new(Metal::new(&car_color, 0.0)),
+            )),
+            0.0,
+        )),
+        Vec3::new(0.0, 0.0, 5.0),
+    )));
+
+    // Car front top
+    world.add(Rc::new(Translate::new(
+        Rc::new(RotateY::new(
+            Rc::new(Quad::new(
+                Vec3::new(1.0, 0.6, 1.0),
+                Vec3::new(-2.0, 0.0, 0.0),
+                Vec3::new(0.0, 0.0, 1.5),
+                Rc::new(Metal::new(&car_color, 0.2)),
+            )),
+            0.0,
+        )),
+        Vec3::new(0.0, 0.0, 5.0),
+    )));
+
+    // Car right window
+    world.add(Rc::new(Translate::new(
+        Rc::new(RotateY::new(
+            Rc::new(Quad::new(
+                Vec3::new(-1.0, 0.6, -1.0),
+                Vec3::new(0.0, 0.0, 2.0),
+                Vec3::new(0.2, 0.4, 0.0),
+                Rc::new(Metal::new(&Vec3::new(0.0, 0.0, 0.0), 0.2)),
+            )),
+            0.0,
+        )),
+        Vec3::new(0.0, 0.0, 5.0),
+    )));
+
+    // Car right back pad
+    world.add(Rc::new(Translate::new(
+        Rc::new(RotateY::new(
+            Rc::new(Quad::new(
+                Vec3::new(-0.8, 0.7, -2.0),
+                Vec3::new(-0.2, -0.3, 0.0),
+                Vec3::new(0.0, 0.3, 1.0),
+                Rc::new(Metal::new(&car_color, 0.2)),
+            )),
+            0.0,
+        )),
+        Vec3::new(0.0, 0.0, 5.0),
+    )));
+
+    // Car right door
+    world.add(Rc::new(Translate::new(
+        Rc::new(RotateY::new(
+            Rc::new(Quad::new(
+                Vec3::new(-1.0, 0.05, -2.5),
+                Vec3::new(0.0, 0.0, 5.0),
+                Vec3::new(0.0, 0.6, 0.0),
+                Rc::new(Metal::new(&car_color, 0.2)),
+            )),
+            0.0,
+        )),
+        Vec3::new(0.0, 0.0, 5.0),
+    )));
+
+    // Car left window
+    world.add(Rc::new(Translate::new(
+        Rc::new(RotateY::new(
+            Rc::new(Quad::new(
+                Vec3::new(1.0, 0.6, -1.0),
+                Vec3::new(0.0, 0.0, 2.0),
+                Vec3::new(-0.2, 0.4, 0.0),
+                Rc::new(Metal::new(&Vec3::new(0.0, 0.0, 0.0), 0.2)),
+            )),
+            0.0,
+        )),
+        Vec3::new(0.0, 0.0, 5.0),
+    )));
+
+    // Car left back pad
+    world.add(Rc::new(Translate::new(
+        Rc::new(RotateY::new(
+            Rc::new(Quad::new(
+                Vec3::new(0.8, 0.7, -2.0),
+                Vec3::new(0.0, 0.3, 1.0),
+                Vec3::new(0.2, -0.3, 0.0),
+                Rc::new(Metal::new(&car_color, 0.2)),
+            )),
+            0.0,
+        )),
+        Vec3::new(0.0, 0.0, 5.0),
+    )));
+
+    // Car left door
+    world.add(Rc::new(Translate::new(
+        Rc::new(RotateY::new(
+            Rc::new(Quad::new(
+                Vec3::new(1.0, 0.6, -2.5),
+                Vec3::new(0.0, 0.0, 5.0),
+                Vec3::new(0.0, -0.55, 0.0),
+                Rc::new(Metal::new(&car_color, 0.2)),
+            )),
+            0.0,
+        )),
+        Vec3::new(0.0, 0.0, 5.0),
+    )));
+
     world
 }
 
