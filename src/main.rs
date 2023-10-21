@@ -8,8 +8,8 @@ extern crate sdl2;
 
 use bvh::BvhNode;
 use camera::Camera;
-use hittable::{HittableList, RotateY, Sphere, Translate};
-use material::{Lambertian, Metal};
+use hittable::{HittableList, Sphere};
+use material::{};
 use sdl2::event::{self, Event};
 use sdl2::keyboard::Keycode;
 // use sdl2::pixels::Color;
@@ -39,6 +39,7 @@ mod random;
 mod ray;
 mod texture;
 mod vector;
+mod worldconstructor;
 
 fn main() {
     let current_path = currentpath::get_executable_directory();
@@ -80,7 +81,7 @@ fn main() {
 
     let mut delta_start_time: Instant = Instant::now();
 
-    let mut camera_rotation: (f64, f64) = (180.0, 2.71);
+    let mut car_rotation: f64 = 180.0;
 
     let mut mouse_locked = false;
     let mut mouse_x = 0;
@@ -89,6 +90,10 @@ fn main() {
     // let mut prof: Profiler = Profiler::new();
 
     println!("Starting render");
+
+    let mut car_pos: (f64, f64, f64) = (4.0, 0.0, 5.0);
+
+    let mut forward_velocity = 0.0;
 
     // Main loop.
     while !quit {
@@ -101,6 +106,14 @@ fn main() {
             &sdl_context,
         );
 
+        camera.lookat = Vec3::new(car_pos.0, car_pos.1 + 1.0, car_pos.2);
+
+        camera.lookfrom = Vec3::new(
+            car_pos.0 + 5.0 * (car_rotation * (std::f64::consts::PI / 180.0)).sin(),
+            car_pos.1 + 3.0,
+            car_pos.2 + 5.0 * (car_rotation * (std::f64::consts::PI / 180.0)).cos(),
+        );
+
         camera.render(&mut world, &mut rng);
 
         update_screen(&mut texture, &camera, &mut canvas);
@@ -108,14 +121,18 @@ fn main() {
         let delta_time = calculate_delta_time(&mut delta_start_time);
 
         move_player(
-            &mut camera_rotation,
+            &mut car_rotation,
             &event_pump,
             &mut camera,
             delta_time,
             &mouse_x,
             &mouse_y,
             &mut world,
+            &mut car_pos,
+            &mut forward_velocity
         );
+
+        // camera_rotation += 1.0 * delta_time;
 
         println!("{} FPS", 62.5 / delta_time);
     }
@@ -173,194 +190,33 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     // Add stuff to world
     let mut world: HittableList = HittableList::new();
 
-    let road1 = Box::new(Quad::new(
-        Vec3::new(-5.0, 0.0, -5.0),
-        Vec3::new(10.0, 0.0, 0.0),
-        Vec3::new(0.0, 0.0, 10.0),
-        Rc::new(Lambertian::new_texture(Rc::new(
-            ImageTexture::new(&(current_path + "road.png")).expect("Could not load image"),
-        ))),
-    ));
-    world.add(Box::new(RotateY::new(road1, 0.0)));
+    worldconstructor::construct_world(current_path, &mut world);
 
     world = HittableList::new_add(Box::new(BvhNode::new_list(&world, rng)));
 
-    let car_color = Vec3::new(1.0, 0.2, 0.1);
-
-    // Car top
-    world.add(Box::new(Translate::new(
-        Box::new(RotateY::new(
-            Box::new(Quad::new(
-                Vec3::new(0.8, 1.0, -1.0),
-                Vec3::new(-1.6, 0.0, 0.0),
-                Vec3::new(0.0, 0.0, 2.0),
-                Rc::new(Metal::new(&car_color, 0.2)),
-            )),
-            0.0,
-        )),
-        Vec3::new(0.0, 0.0, 5.0),
-    )));
-
-    // Car back glass
-    world.add(Box::new(Translate::new(
-        Box::new(RotateY::new(
-            Box::new(Quad::new(
-                Vec3::new(0.8, 0.6, -2.0),
-                Vec3::new(-1.6, 0.0, 0.0),
-                Vec3::new(0.0, 0.4, 1.0),
-                Rc::new(Metal::new(&Vec3::new(0.0, 0.0, 0.0), 0.2)),
-            )),
-            0.0,
-        )),
-        Vec3::new(0.0, 0.0, 5.0),
-    )));
-
-    // Car back top
-    world.add(Box::new(Translate::new(
-        Box::new(RotateY::new(
-            Box::new(Quad::new(
-                Vec3::new(1.0, 0.6, -2.5),
-                Vec3::new(-2.0, 0.0, 0.0),
-                Vec3::new(0.0, 0.1, 1.5),
-                Rc::new(Metal::new(&car_color, 0.2)),
-            )),
-            0.0,
-        )),
-        Vec3::new(0.0, 0.0, 5.0),
-    )));
-
-    // Car back back
-    world.add(Box::new(Translate::new(
-        Box::new(RotateY::new(
-            Box::new(Quad::new(
-                Vec3::new(1.0, 0.05, -2.7),
-                Vec3::new(-2.0, 0.0, 0.0),
-                Vec3::new(0.0, 0.55, 0.2),
-                Rc::new(Metal::new(&car_color, 0.0)),
-            )),
-            0.0,
-        )),
-        Vec3::new(0.0, 0.0, 5.0),
-    )));
-
-    // Car front top
-    world.add(Box::new(Translate::new(
-        Box::new(RotateY::new(
-            Box::new(Quad::new(
-                Vec3::new(1.0, 0.6, 1.0),
-                Vec3::new(-2.0, 0.0, 0.0),
-                Vec3::new(0.0, 0.0, 1.5),
-                Rc::new(Metal::new(&car_color, 0.2)),
-            )),
-            0.0,
-        )),
-        Vec3::new(0.0, 0.0, 5.0),
-    )));
-
-    // Car right window
-    world.add(Box::new(Translate::new(
-        Box::new(RotateY::new(
-            Box::new(Quad::new(
-                Vec3::new(-1.0, 0.6, -1.0),
-                Vec3::new(0.0, 0.0, 2.0),
-                Vec3::new(0.2, 0.4, 0.0),
-                Rc::new(Metal::new(&Vec3::new(0.0, 0.0, 0.0), 0.2)),
-            )),
-            0.0,
-        )),
-        Vec3::new(0.0, 0.0, 5.0),
-    )));
-
-    // Car right back pad
-    world.add(Box::new(Translate::new(
-        Box::new(RotateY::new(
-            Box::new(Quad::new(
-                Vec3::new(-0.8, 0.7, -2.0),
-                Vec3::new(-0.2, -0.3, 0.0),
-                Vec3::new(0.0, 0.3, 1.0),
-                Rc::new(Metal::new(&car_color, 0.2)),
-            )),
-            0.0,
-        )),
-        Vec3::new(0.0, 0.0, 5.0),
-    )));
-
-    // Car right door
-    world.add(Box::new(Translate::new(
-        Box::new(RotateY::new(
-            Box::new(Quad::new(
-                Vec3::new(-1.0, 0.05, -2.5),
-                Vec3::new(0.0, 0.0, 5.0),
-                Vec3::new(0.0, 0.6, 0.0),
-                Rc::new(Metal::new(&car_color, 0.2)),
-            )),
-            0.0,
-        )),
-        Vec3::new(0.0, 0.0, 5.0),
-    )));
-
-    // Car left window
-    world.add(Box::new(Translate::new(
-        Box::new(RotateY::new(
-            Box::new(Quad::new(
-                Vec3::new(1.0, 0.6, -1.0),
-                Vec3::new(0.0, 0.0, 2.0),
-                Vec3::new(-0.2, 0.4, 0.0),
-                Rc::new(Metal::new(&Vec3::new(0.0, 0.0, 0.0), 0.2)),
-            )),
-            0.0,
-        )),
-        Vec3::new(0.0, 0.0, 5.0),
-    )));
-
-    // Car left back pad
-    world.add(Box::new(Translate::new(
-        Box::new(RotateY::new(
-            Box::new(Quad::new(
-                Vec3::new(0.8, 0.7, -2.0),
-                Vec3::new(0.0, 0.3, 1.0),
-                Vec3::new(0.2, -0.3, 0.0),
-                Rc::new(Metal::new(&car_color, 0.2)),
-            )),
-            0.0,
-        )),
-        Vec3::new(0.0, 0.0, 5.0),
-    )));
-
-    // Car left door
-    world.add(Box::new(Translate::new(
-        Box::new(RotateY::new(
-            Box::new(Quad::new(
-                Vec3::new(1.0, 0.6, -2.5),
-                Vec3::new(0.0, 0.0, 5.0),
-                Vec3::new(0.0, -0.55, 0.0),
-                Rc::new(Metal::new(&car_color, 0.2)),
-            )),
-            0.0,
-        )),
-        Vec3::new(0.0, 0.0, 5.0),
-    )));
+    worldconstructor::construct_car(&mut world);
 
     world
 }
 
 fn move_player(
-    camera_rotation: &mut (f64, f64),
+    camera_rotation: &mut f64,
     event_pump: &sdl2::EventPump,
     camera: &mut Camera,
     delta_time: f64,
     mouse_x: &i32,
     mouse_y: &i32,
     world: &mut HittableList,
+    car_pos: &mut (f64, f64, f64),
+    forward_velocity: &mut f64,
 ) {
     const MOVE_SPEED: f64 = 0.1;
 
-    camera_rotation.0 += delta_time * (*mouse_x as f64) / 5.0;
-    camera_rotation.1 += delta_time * (*mouse_y as f64) / 5.0;
+    // camera_rotation.0 += delta_time * (*mouse_x as f64) / 5.0;
+    // camera_rotation.1 += delta_time * (*mouse_y as f64) / 5.0;
 
-    let camera_rot_x: f64 = camera_rotation.0 * (std::f64::consts::PI / 180.0);
-    let camera_rot_y: f64 = camera_rotation.1 * (std::f64::consts::PI / 180.0);
-    // println!("{}, {}", camera_rotation.0, camera_rot_x);
+    let mut camera_rot_x: f64 = *camera_rotation * (std::f64::consts::PI / 180.0);
+    // let camera_rot_y: f64 = camera_rotation.1 * (std::f64::consts::PI / 180.0);
 
     let pressed: HashSet<Keycode> = event_pump
         .keyboard_state()
@@ -369,38 +225,30 @@ fn move_player(
         .collect();
 
     if pressed.contains(&sdl2::keyboard::Keycode::W) {
-        camera
-            .lookfrom
-            .setz(camera.lookfrom.z() - (MOVE_SPEED * delta_time * camera_rot_x.cos()));
-        camera
-            .lookfrom
-            .setx(camera.lookfrom.x() + (MOVE_SPEED * delta_time * camera_rot_x.sin()));
+        *forward_velocity = 0.2;
+    } else {
+        *forward_velocity = 0.0;
     }
-    if pressed.contains(&sdl2::keyboard::Keycode::S) {
+    println!("{}", forward_velocity);
+    car_pos.2 -= (*forward_velocity * delta_time * camera_rot_x.cos());
+    car_pos.0 -= (*forward_velocity * delta_time * camera_rot_x.sin());
+    /*if pressed.contains(&sdl2::keyboard::Keycode::S) {
         camera
             .lookfrom
             .setz(camera.lookfrom.z() + (MOVE_SPEED * delta_time * camera_rot_x.cos()));
         camera
             .lookfrom
             .setx(camera.lookfrom.x() - (MOVE_SPEED * delta_time * camera_rot_x.sin()));
-    }
+    }*/
     if pressed.contains(&sdl2::keyboard::Keycode::A) {
-        camera
-            .lookfrom
-            .setz(camera.lookfrom.z() - (MOVE_SPEED * delta_time * camera_rot_x.sin()));
-        camera
-            .lookfrom
-            .setx(camera.lookfrom.x() - (MOVE_SPEED * delta_time * camera_rot_x.cos()));
+        *camera_rotation += 4.0;
+        camera_rot_x = *camera_rotation * (std::f64::consts::PI / 180.0);
     }
     if pressed.contains(&sdl2::keyboard::Keycode::D) {
-        camera
-            .lookfrom
-            .setz(camera.lookfrom.z() + (MOVE_SPEED * delta_time * camera_rot_x.sin()));
-        camera
-            .lookfrom
-            .setx(camera.lookfrom.x() + (MOVE_SPEED * delta_time * camera_rot_x.cos()));
+        *camera_rotation -= 4.0;
+        camera_rot_x = *camera_rotation * (std::f64::consts::PI / 180.0);
     }
-    if pressed.contains(&sdl2::keyboard::Keycode::Space) {
+    /*if pressed.contains(&sdl2::keyboard::Keycode::Space) {
         camera
             .lookfrom
             .sety(camera.lookfrom.y() + (MOVE_SPEED * delta_time));
@@ -409,7 +257,7 @@ fn move_player(
         camera
             .lookfrom
             .sety(camera.lookfrom.y() - (MOVE_SPEED * delta_time));
-    }
+    }*/
 
     /*if(keyboard_state[SDL_SCANCODE_A]) {
         cameraZ -= moveSpeed * delta * sin(rotX);
@@ -420,17 +268,15 @@ fn move_player(
         cameraX += moveSpeed * delta * cos(rotX);
     }*/
 
-    let (car_x, car_y, car_z) = (4.0, 0.0, 5.0);
-
     for i in 1..12 {
-        world.objects[i].set_translate((car_x, car_y, car_z));
+        world.objects[i].set_translate(*car_pos);
     }
 
-    let look_x: f64 = camera.lookfrom.x() + (camera_rot_x.sin() * camera_rot_y.cos());
-    let look_y: f64 = camera.lookfrom.y() - (camera_rot_y.sin() * 1.5);
-    let look_z: f64 = camera.lookfrom.z() - (camera_rot_x.cos() * camera_rot_y.cos());
+    // let look_x: f64 = camera.lookfrom.x() + (camera_rot_x.sin() * camera_rot_y.cos());
+    // let look_y: f64 = camera.lookfrom.y() - (camera_rot_y.sin() * 1.5);
+    // let look_z: f64 = camera.lookfrom.z() - (camera_rot_x.cos() * camera_rot_y.cos());
 
-    camera.lookat = Vec3::new(look_x, look_y, look_z);
+    // camera.lookat = Vec3::new(look_x, look_y, look_z);
 }
 
 fn update_screen(
