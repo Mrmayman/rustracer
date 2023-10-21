@@ -122,3 +122,14 @@ impl AABB {
         AABB::new_interval(new_x, new_y, new_z)
     }
 }
+
+impl std::ops::Add<Vec3> for AABB {
+    type Output = AABB;
+    fn add(self, rhs: Vec3) -> AABB {
+        AABB {
+            x: self.x + rhs.x(),
+            y: self.y + rhs.y(),
+            z: self.z + rhs.z(),
+        }
+    }
+}

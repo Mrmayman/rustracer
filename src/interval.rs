@@ -68,3 +68,13 @@ static UNIVERSE: Interval = Interval {
     min: NEG_INFINITY,
     max: INFINITY,
 };
+
+impl std::ops::Add<f64> for Interval {
+    type Output = Interval;
+    fn add(self, other: f64) -> Interval {
+        Interval {
+            min: self.min + other,
+            max: self.max + other,
+        }
+    }
+}
