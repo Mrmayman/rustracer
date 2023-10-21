@@ -9,6 +9,7 @@ use crate::{
     vector::{cross, dot},
 };
 
+#[derive(Clone)]
 pub struct HitRecord {
     pub point: Vec3,
     pub normal: Vec3,
@@ -40,18 +41,6 @@ impl HitRecord {
             self.normal = outward_normal.clone();
         } else {
             self.normal = -outward_normal.clone();
-        }
-    }
-
-    fn clone_custom(&self) -> HitRecord {
-        HitRecord {
-            point: self.point,
-            normal: self.normal,
-            t: self.t,
-            front_face: self.front_face,
-            material: self.material.clone(),
-            u: self.u,
-            v: self.v,
         }
     }
 }
@@ -186,7 +175,7 @@ impl Hittable for HittableList {
             ) {
                 hit_anything = true;
                 closest_so_far = temp_record.t;
-                *hit_record = temp_record.clone_custom();
+                *hit_record = temp_record.clone();
                 break;
             }
         }
