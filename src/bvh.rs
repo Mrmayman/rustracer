@@ -11,8 +11,8 @@ use crate::{
 };
 
 pub struct BvhNode {
-    left: Rc<dyn Hittable>,
-    right: Rc<dyn Hittable>,
+    left: Box<dyn Hittable>,
+    right: Box<dyn Hittable>,
     bbox: AABB,
 }
 
@@ -40,11 +40,23 @@ impl Hittable for BvhNode {
     fn bounding_box(&self) -> AABB {
         self.bbox.clone()
     }
+
+    fn clone_custom(&self) -> Box<dyn Hittable> {
+        Box::new(BvhNode {
+            left: self.left.clone_custom(),
+            right: self.right.clone_custom(),
+            bbox: self.bbox.clone(),
+        })
+    }
+
+    fn get_translate(&self) -> (f64, f64, f64) {(0.0, 0.0, 0.0)}
+
+    fn set_translate(&mut self, pos: (f64, f64, f64)) {}
 }
 
 impl BvhNode {
     pub fn new(
-        src_objects: &Vec<Rc<dyn Hittable>>,
+        src_objects: &Vec<Box<dyn Hittable>>,
         start: usize,
         end: usize,
         rng: &mut XorShiftRng,
@@ -52,7 +64,7 @@ impl BvhNode {
         let objects = src_objects; // Create a modifiable array of the source scene objects
 
         let axis: i32 = random_int_range(0, 2, rng);
-        type CompareFunction = fn(Rc<dyn Hittable>, Rc<dyn Hittable>) -> bool;
+        type CompareFunction = fn(&Box<dyn Hittable>, &Box<dyn Hittable>) -> bool;
         let comparator: CompareFunction;
         if axis == 0 {
             comparator = BvhNode::box_x_compare;
@@ -64,29 +76,28 @@ impl BvhNode {
 
         let object_span: usize = end - start;
 
-        let left: Rc<dyn Hittable>;
-        let right: Rc<dyn Hittable>;
+        let left: Box<dyn Hittable>;
+        let right: Box<dyn Hittable>;
 
         if object_span == 1 {
-            right = objects[start].clone();
-            left = objects[start].clone();
-        } else if (object_span == 2) {
-            if comparator(objects[start].clone(), objects[start + 1].clone()) {
-                left = objects[start].clone();
-                right = objects[start + 1].clone();
+            right = objects[start].clone_custom();
+            left = objects[start].clone_custom();
+        } else if object_span == 2 {
+            if comparator(&objects[start], &objects[start + 1]) {
+                left = objects[start].clone_custom();
+                right = objects[start + 1].clone_custom();
             } else {
-                left = objects[start + 1].clone();
-                right = objects[start].clone();
+                left = objects[start + 1].clone_custom();
+                right = objects[start].clone_custom();
             }
         } else {
             // Port this line
             // std::sort(objects.begin() + start, objects.begin() + end, comparator);
-            let mut objects_slice: Vec<Rc<dyn Hittable>> = objects[start..end]
+            let mut objects_slice: Vec<&Box<dyn Hittable>> = objects[start..end]
                 .iter()
-                .map(|item| Rc::clone(item))
-                .collect();
+                .collect::<Vec<&Box<dyn Hittable>>>();
             objects_slice.sort_by(|a, b| {
-                if comparator(a.clone(), b.clone()) {
+                if comparator(a, b) {
                     std::cmp::Ordering::Less
                 } else {
                     std::cmp::Ordering::Greater
@@ -94,8 +105,8 @@ impl BvhNode {
             });
 
             let mid: usize = start + object_span / 2;
-            left = Rc::new(BvhNode::new(objects, start, mid, rng));
-            right = Rc::new(BvhNode::new(objects, mid, end, rng));
+            left = Box::new(BvhNode::new(objects, start, mid, rng));
+            right = Box::new(BvhNode::new(objects, mid, end, rng));
         }
 
         let bbox = AABB::new_aabb(&left.bounding_box(), &right.bounding_box());
@@ -111,19 +122,19 @@ impl BvhNode {
         BvhNode::new(&list.objects, 0, list.objects.len(), rng)
     }
 
-    fn box_compare(a: Rc<dyn Hittable>, b: Rc<dyn Hittable>, axis_index: i32) -> bool {
+    fn box_compare(a: &Box<dyn Hittable>, b: &Box<dyn Hittable>, axis_index: i32) -> bool {
         return a.bounding_box().axis(axis_index).min < b.bounding_box().axis(axis_index).min;
     }
 
-    fn box_x_compare(a: Rc<dyn Hittable>, b: Rc<dyn Hittable>) -> bool {
+    fn box_x_compare(a: &Box<dyn Hittable>, b: &Box<dyn Hittable>) -> bool {
         return BvhNode::box_compare(a, b, 0);
     }
 
-    fn box_y_compare(a: Rc<dyn Hittable>, b: Rc<dyn Hittable>) -> bool {
+    fn box_y_compare(a: &Box<dyn Hittable>, b: &Box<dyn Hittable>) -> bool {
         return BvhNode::box_compare(a, b, 1);
     }
 
-    fn box_z_compare(a: Rc<dyn Hittable>, b: Rc<dyn Hittable>) -> bool {
+    fn box_z_compare(a: &Box<dyn Hittable>, b: &Box<dyn Hittable>) -> bool {
         return BvhNode::box_compare(a, b, 2);
     }
 }

@@ -113,6 +113,7 @@ fn main() {
             delta_time,
             &mouse_x,
             &mouse_y,
+            &mut world
         );
 
         println!("{} FPS", 62.5 / delta_time);
@@ -171,7 +172,7 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     // Add stuff to world
     let mut world: HittableList = HittableList::new();
 
-    let road1 = Rc::new(Quad::new(
+    let road1 = Box::new(Quad::new(
         Vec3::new(-5.0, 0.0, -5.0),
         Vec3::new(10.0, 0.0, 0.0),
         Vec3::new(0.0, 0.0, 10.0),
@@ -179,16 +180,16 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
             ImageTexture::new(&(current_path + "road.png")).expect("Could not load image"),
         ))),
     ));
-    world.add(Rc::new(RotateY::new(road1, 0.0)));
+    world.add(Box::new(RotateY::new(road1, 0.0)));
 
-    world = HittableList::new_add(Rc::new(BvhNode::new_list(&world, rng)));
+    world = HittableList::new_add(Box::new(BvhNode::new_list(&world, rng)));
 
     let car_color = Vec3::new(1.0, 0.2, 0.1);
 
     // Car top
-    world.add(Rc::new(Translate::new(
-        Rc::new(RotateY::new(
-            Rc::new(Quad::new(
+    world.add(Box::new(Translate::new(
+        Box::new(RotateY::new(
+            Box::new(Quad::new(
                 Vec3::new(0.8, 1.0, -1.0),
                 Vec3::new(-1.6, 0.0, 0.0),
                 Vec3::new(0.0, 0.0, 2.0),
@@ -200,9 +201,9 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     )));
 
     // Car back glass
-    world.add(Rc::new(Translate::new(
-        Rc::new(RotateY::new(
-            Rc::new(Quad::new(
+    world.add(Box::new(Translate::new(
+        Box::new(RotateY::new(
+            Box::new(Quad::new(
                 Vec3::new(0.8, 0.6, -2.0),
                 Vec3::new(-1.6, 0.0, 0.0),
                 Vec3::new(0.0, 0.4, 1.0),
@@ -214,9 +215,9 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     )));
 
     // Car back top
-    world.add(Rc::new(Translate::new(
-        Rc::new(RotateY::new(
-            Rc::new(Quad::new(
+    world.add(Box::new(Translate::new(
+        Box::new(RotateY::new(
+            Box::new(Quad::new(
                 Vec3::new(1.0, 0.6, -2.5),
                 Vec3::new(-2.0, 0.0, 0.0),
                 Vec3::new(0.0, 0.1, 1.5),
@@ -228,9 +229,9 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     )));
 
     // Car back back
-    world.add(Rc::new(Translate::new(
-        Rc::new(RotateY::new(
-            Rc::new(Quad::new(
+    world.add(Box::new(Translate::new(
+        Box::new(RotateY::new(
+            Box::new(Quad::new(
                 Vec3::new(1.0, 0.05, -2.7),
                 Vec3::new(-2.0, 0.0, 0.0),
                 Vec3::new(0.0, 0.55, 0.2),
@@ -242,9 +243,9 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     )));
 
     // Car front top
-    world.add(Rc::new(Translate::new(
-        Rc::new(RotateY::new(
-            Rc::new(Quad::new(
+    world.add(Box::new(Translate::new(
+        Box::new(RotateY::new(
+            Box::new(Quad::new(
                 Vec3::new(1.0, 0.6, 1.0),
                 Vec3::new(-2.0, 0.0, 0.0),
                 Vec3::new(0.0, 0.0, 1.5),
@@ -256,9 +257,9 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     )));
 
     // Car right window
-    world.add(Rc::new(Translate::new(
-        Rc::new(RotateY::new(
-            Rc::new(Quad::new(
+    world.add(Box::new(Translate::new(
+        Box::new(RotateY::new(
+            Box::new(Quad::new(
                 Vec3::new(-1.0, 0.6, -1.0),
                 Vec3::new(0.0, 0.0, 2.0),
                 Vec3::new(0.2, 0.4, 0.0),
@@ -270,9 +271,9 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     )));
 
     // Car right back pad
-    world.add(Rc::new(Translate::new(
-        Rc::new(RotateY::new(
-            Rc::new(Quad::new(
+    world.add(Box::new(Translate::new(
+        Box::new(RotateY::new(
+            Box::new(Quad::new(
                 Vec3::new(-0.8, 0.7, -2.0),
                 Vec3::new(-0.2, -0.3, 0.0),
                 Vec3::new(0.0, 0.3, 1.0),
@@ -284,9 +285,9 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     )));
 
     // Car right door
-    world.add(Rc::new(Translate::new(
-        Rc::new(RotateY::new(
-            Rc::new(Quad::new(
+    world.add(Box::new(Translate::new(
+        Box::new(RotateY::new(
+            Box::new(Quad::new(
                 Vec3::new(-1.0, 0.05, -2.5),
                 Vec3::new(0.0, 0.0, 5.0),
                 Vec3::new(0.0, 0.6, 0.0),
@@ -298,9 +299,9 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     )));
 
     // Car left window
-    world.add(Rc::new(Translate::new(
-        Rc::new(RotateY::new(
-            Rc::new(Quad::new(
+    world.add(Box::new(Translate::new(
+        Box::new(RotateY::new(
+            Box::new(Quad::new(
                 Vec3::new(1.0, 0.6, -1.0),
                 Vec3::new(0.0, 0.0, 2.0),
                 Vec3::new(-0.2, 0.4, 0.0),
@@ -312,9 +313,9 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     )));
 
     // Car left back pad
-    world.add(Rc::new(Translate::new(
-        Rc::new(RotateY::new(
-            Rc::new(Quad::new(
+    world.add(Box::new(Translate::new(
+        Box::new(RotateY::new(
+            Box::new(Quad::new(
                 Vec3::new(0.8, 0.7, -2.0),
                 Vec3::new(0.0, 0.3, 1.0),
                 Vec3::new(0.2, -0.3, 0.0),
@@ -326,9 +327,9 @@ fn init_world(current_path: String, rng: &mut XorShiftRng) -> HittableList {
     )));
 
     // Car left door
-    world.add(Rc::new(Translate::new(
-        Rc::new(RotateY::new(
-            Rc::new(Quad::new(
+    world.add(Box::new(Translate::new(
+        Box::new(RotateY::new(
+            Box::new(Quad::new(
                 Vec3::new(1.0, 0.6, -2.5),
                 Vec3::new(0.0, 0.0, 5.0),
                 Vec3::new(0.0, -0.55, 0.0),
@@ -349,6 +350,7 @@ fn move_player(
     delta_time: f64,
     mouse_x: &i32,
     mouse_y: &i32,
+    world: &mut HittableList,
 ) {
     const MOVE_SPEED: f64 = 0.1;
 
@@ -428,6 +430,12 @@ fn move_player(
         cameraZ += moveSpeed * delta * sin(rotX);
         cameraX += moveSpeed * delta * cos(rotX);
     }*/
+
+    let (car_x, car_y, car_z) = (4.0, 0.0, 5.0);
+
+    for i in 1..12 {
+        world.objects[i].set_translate((car_x, car_y, car_z));
+    }
 
     let look_x: f64 = camera.lookfrom.x() + (camera_rot_x.sin() * camera_rot_y.cos());
     let look_y: f64 = camera.lookfrom.y() - (camera_rot_y.sin() * 1.5);

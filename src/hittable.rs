@@ -4,7 +4,7 @@ use crate::{
     aabb::AABB,
     interval::Interval,
     material::{Lambertian, Material},
-    ray::{Ray, degrees_to_radians},
+    ray::{degrees_to_radians, Ray},
     vector::Vec3,
     vector::{cross, dot},
 };
@@ -48,6 +48,9 @@ impl HitRecord {
 pub trait Hittable {
     fn hit(&self, hit_ray: &Ray, ray_t: Interval, hit_record: &mut HitRecord) -> bool;
     fn bounding_box(&self) -> AABB;
+    fn get_translate(&self) -> (f64, f64, f64);
+    fn set_translate(&mut self, pos: (f64, f64, f64));
+    fn clone_custom(&self) -> Box<dyn Hittable>;
 }
 
 pub struct Sphere {
@@ -128,10 +131,25 @@ impl Hittable for Sphere {
     fn bounding_box(&self) -> AABB {
         self.bbox.clone()
     }
+
+    fn get_translate(&self) -> (f64, f64, f64) {
+        (0.0, 0.0, 0.0)
+    }
+
+    fn set_translate(&mut self, pos: (f64, f64, f64)) {}
+
+    fn clone_custom(&self) -> Box<dyn Hittable> {
+        Box::new(Sphere {
+            center: self.center,
+            radius: self.radius,
+            material: self.material.clone(),
+            bbox: self.bbox.clone(),
+        })
+    }
 }
 
 pub struct HittableList {
-    pub objects: Vec<Rc<dyn Hittable>>,
+    pub objects: Vec<Box<dyn Hittable>>,
     bbox: AABB,
 }
 
@@ -143,7 +161,7 @@ impl HittableList {
         }
     }
 
-    pub fn new_add(object: Rc<dyn Hittable>) -> HittableList {
+    pub fn new_add(object: Box<dyn Hittable>) -> HittableList {
         let mut temp_list = HittableList {
             objects: Vec::new(),
             bbox: AABB::new(),
@@ -152,9 +170,16 @@ impl HittableList {
         temp_list
     }
 
-    pub fn add(&mut self, object: Rc<dyn Hittable>) {
+    pub fn add(&mut self, object: Box<dyn Hittable>) {
         self.bbox = AABB::new_aabb(&self.bbox, &object.bounding_box());
         self.objects.push(object);
+    }
+
+    fn manual_clone_vec_custom(original_vec: &Vec<Box<dyn Hittable>>) -> Vec<Box<dyn Hittable>> {
+        original_vec
+            .iter()
+            .map(|item| item.clone_custom())
+            .collect()
     }
 }
 
@@ -184,6 +209,19 @@ impl Hittable for HittableList {
 
     fn bounding_box(&self) -> AABB {
         self.bbox.clone()
+    }
+
+    fn get_translate(&self) -> (f64, f64, f64) {
+        (0.0, 0.0, 0.0)
+    }
+
+    fn set_translate(&mut self, pos: (f64, f64, f64)) {}
+
+    fn clone_custom(&self) -> Box<dyn Hittable> {
+        Box::new(HittableList {
+            objects: HittableList::manual_clone_vec_custom(&self.objects),
+            bbox: self.bbox.clone(),
+        })
     }
 }
 
@@ -235,6 +273,25 @@ impl Hittable for Quad {
     fn bounding_box(&self) -> AABB {
         self.bbox.clone()
     }
+
+    fn get_translate(&self) -> (f64, f64, f64) {
+        (0.0, 0.0, 0.0)
+    }
+
+    fn set_translate(&mut self, pos: (f64, f64, f64)) {}
+
+    fn clone_custom(&self) -> Box<dyn Hittable> {
+        Box::new(Quad {
+            q: self.q,
+            u: self.u,
+            v: self.v,
+            mat: self.mat.clone(),
+            bbox: self.bbox.clone(),
+            normal: self.normal,
+            d: self.d,
+            w: self.w,
+        })
+    }
 }
 
 impl Quad {
@@ -276,7 +333,7 @@ impl Quad {
 }
 
 pub struct Translate {
-    pub object: Rc<dyn Hittable>,
+    pub object: Box<dyn Hittable>,
     pub offset: Vec3,
     bbox: AABB,
 }
@@ -304,10 +361,26 @@ impl Hittable for Translate {
     fn bounding_box(&self) -> AABB {
         self.bbox.clone()
     }
+
+    fn get_translate(&self) -> (f64, f64, f64) {
+        (self.offset.x(), self.offset.y(), self.offset.z())
+    }
+
+    fn set_translate(&mut self, pos: (f64, f64, f64)) {
+        self.offset = Vec3::new(pos.0, pos.1, pos.2);
+    }
+
+    fn clone_custom(&self) -> Box<dyn Hittable> {
+        Box::new(Translate {
+            object: self.object.clone_custom(),
+            offset: self.offset,
+            bbox: self.bbox.clone()
+        })
+    }
 }
 
 impl Translate {
-    pub fn new(object: Rc<dyn Hittable>, offset: Vec3) -> Translate {
+    pub fn new(object: Box<dyn Hittable>, offset: Vec3) -> Translate {
         let bbox = object.bounding_box() + offset;
         Translate {
             object,
@@ -318,10 +391,10 @@ impl Translate {
 }
 
 pub struct RotateY {
-    object: Rc<dyn Hittable>,
+    object: Box<dyn Hittable>,
     sin_theta: f64,
     cos_theta: f64,
-    bbox: AABB
+    bbox: AABB,
 }
 
 impl Hittable for RotateY {
@@ -330,11 +403,13 @@ impl Hittable for RotateY {
         let mut origin = hit_ray.origin();
         let mut direction = hit_ray.direction();
 
-        origin[0] = self.cos_theta*hit_ray.origin()[0] - self.sin_theta*hit_ray.origin()[2];
-        origin[2] = self.sin_theta*hit_ray.origin()[0] + self.cos_theta*hit_ray.origin()[2];
+        origin[0] = self.cos_theta * hit_ray.origin()[0] - self.sin_theta * hit_ray.origin()[2];
+        origin[2] = self.sin_theta * hit_ray.origin()[0] + self.cos_theta * hit_ray.origin()[2];
 
-        direction[0] = self.cos_theta*hit_ray.direction()[0] - self.sin_theta*hit_ray.direction()[2];
-        direction[2] = self.sin_theta*hit_ray.direction()[0] + self.cos_theta*hit_ray.direction()[2];
+        direction[0] =
+            self.cos_theta * hit_ray.direction()[0] - self.sin_theta * hit_ray.direction()[2];
+        direction[2] =
+            self.sin_theta * hit_ray.direction()[0] + self.cos_theta * hit_ray.direction()[2];
 
         let rotated_r: Ray = Ray::new(origin, direction, hit_ray.time());
 
@@ -345,13 +420,13 @@ impl Hittable for RotateY {
 
         // Change the intersection point from object space to world space
         let mut p = hit_record.point;
-        p[0] =  self.cos_theta*hit_record.point[0] + self.sin_theta*hit_record.point[2];
-        p[2] = -self.sin_theta*hit_record.point[0] + self.cos_theta*hit_record.point[2];
+        p[0] = self.cos_theta * hit_record.point[0] + self.sin_theta * hit_record.point[2];
+        p[2] = -self.sin_theta * hit_record.point[0] + self.cos_theta * hit_record.point[2];
 
         // Change the normal from object space to world space
         let mut normal = hit_record.normal;
-        normal[0] =  self.cos_theta*hit_record.normal[0] + self.sin_theta*hit_record.normal[2];
-        normal[2] = -self.sin_theta*hit_record.normal[0] + self.cos_theta*hit_record.normal[2];
+        normal[0] = self.cos_theta * hit_record.normal[0] + self.sin_theta * hit_record.normal[2];
+        normal[2] = -self.sin_theta * hit_record.normal[0] + self.cos_theta * hit_record.normal[2];
 
         hit_record.point = p;
         hit_record.normal = normal;
@@ -362,15 +437,30 @@ impl Hittable for RotateY {
     fn bounding_box(&self) -> AABB {
         self.bbox.clone()
     }
+
+    fn get_translate(&self) -> (f64, f64, f64) {
+        (0.0, 0.0, 0.0)
+    }
+
+    fn set_translate(&mut self, pos: (f64, f64, f64)) {}
+
+    fn clone_custom(&self) -> Box<dyn Hittable> {
+        Box::new(RotateY {
+            object: self.object.clone_custom(),
+            sin_theta: self.sin_theta,
+            cos_theta: self.cos_theta,
+            bbox: self.bbox.clone()
+        })
+    }
 }
 
 impl RotateY {
-    pub fn new(p: Rc<dyn Hittable>, angle: f64) -> RotateY {
+    pub fn new(p: Box<dyn Hittable>, angle: f64) -> RotateY {
         let mut temp_rot_y = RotateY {
             object: p,
             sin_theta: 0.0,
             cos_theta: 0.0,
-            bbox: AABB::new()
+            bbox: AABB::new(),
         };
 
         let radians = degrees_to_radians(angle);
@@ -378,22 +468,25 @@ impl RotateY {
         temp_rot_y.cos_theta = radians.cos();
         temp_rot_y.bbox = temp_rot_y.object.bounding_box();
 
-        let mut min: Vec3 = Vec3::new( f64::INFINITY,  f64::INFINITY,  f64::INFINITY);
+        let mut min: Vec3 = Vec3::new(f64::INFINITY, f64::INFINITY, f64::INFINITY);
         let mut max: Vec3 = Vec3::new(f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
 
         for i in 0..2 {
             for j in 0..2 {
                 for k in 0..2 {
-                    let x = (i as f64 * temp_rot_y.bbox.x.max) + ((1-i) as f64 * temp_rot_y.bbox.x.min);
-                    let y = (j as f64 * temp_rot_y.bbox.y.max) + ((1-j) as f64 * temp_rot_y.bbox.y.min);
-                    let z = (k as f64 * temp_rot_y.bbox.z.max) + ((1-k) as f64 * temp_rot_y.bbox.z.min);
+                    let x = (i as f64 * temp_rot_y.bbox.x.max)
+                        + ((1 - i) as f64 * temp_rot_y.bbox.x.min);
+                    let y = (j as f64 * temp_rot_y.bbox.y.max)
+                        + ((1 - j) as f64 * temp_rot_y.bbox.y.min);
+                    let z = (k as f64 * temp_rot_y.bbox.z.max)
+                        + ((1 - k) as f64 * temp_rot_y.bbox.z.min);
 
-                    let newx =  temp_rot_y.cos_theta*x + temp_rot_y.sin_theta*z;
-                    let newz = -temp_rot_y.sin_theta*x + temp_rot_y.cos_theta*z;
+                    let newx = temp_rot_y.cos_theta * x + temp_rot_y.sin_theta * z;
+                    let newz = -temp_rot_y.sin_theta * x + temp_rot_y.cos_theta * z;
 
                     let tester: Vec3 = Vec3::new(newx, y, newz);
 
-                    for c in 0..3{
+                    for c in 0..3 {
                         min[c] = f64::min(min[c], tester[c]);
                         max[c] = f64::max(max[c], tester[c]);
                     }
