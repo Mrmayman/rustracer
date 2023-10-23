@@ -11,6 +11,8 @@ pub struct HitRecord {
     pub point: Vec3,
     pub normal: Vec3,
     pub t: f64,
+    pub u: f64,
+    pub v: f64,
     pub mat: Box<dyn Material>,
     pub front_face: bool,
 }
@@ -21,7 +23,9 @@ impl HitRecord {
             point: Vec3::new_default(),
             normal: Vec3::new_default(),
             t: 0.0,
-            mat: Box::new(Lambertian::new(&Vec3::new(1.0, 0.0, 1.0))),
+            u: 0.0,
+            v: 0.0,
+            mat: Box::new(Lambertian::new_color(&Vec3::new(1.0, 0.0, 1.0))),
             front_face: false,
         }
     }
@@ -40,6 +44,8 @@ impl HitRecord {
             point: self.point,
             normal: self.normal,
             t: self.t,
+            u: self.u,
+            v: self.v,
             mat: self.mat.clone(),
             front_face: self.front_face,
         }

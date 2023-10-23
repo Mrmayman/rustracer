@@ -25,8 +25,9 @@ use sdl2::render::Canvas;
 use sdl2::video::Window;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use texture::image_texture::ImageTexture;
 use utils::{degrees_to_radians, random_double};
-use vector::Vec3;
+use vector::{Vec3, cross};
 
 const SCREEN_WIDTH: u32 = 800;
 const SCREEN_HEIGHT: u32 = 600;
@@ -36,18 +37,25 @@ const MAX_DEPTH: i32 = 50;
 
 const THREAD_ROWS: usize = 12;
 
+mod aabb;
 mod interval;
 mod pixel_buffer;
 mod ray;
 mod utils;
 mod vector;
-mod aabb;
+
+mod texture {
+    pub mod base;
+    pub mod checker;
+    pub mod image_texture;
+    pub mod solid_color;
+}
 
 mod hittable {
     pub mod base;
+    pub mod bvh_node;
     pub mod hittable_list;
     pub mod sphere;
-    pub mod bvh_node;
 }
 
 mod material {
@@ -57,6 +65,8 @@ mod material {
 }
 
 fn main() {
+    let current_path = get_executable_directory();
+
     // Set up renderer.
     let sdl_context: sdl2::Sdl = sdl2::init().unwrap();
     let video_subsystem: sdl2::VideoSubsystem = sdl_context.video().unwrap();
@@ -103,11 +113,16 @@ fn main() {
     let mut camera_center: Vec3 = Vec3::new_default();
     let mut pixel00_loc: Vec3 = Vec3::new_default();
 
+    let lookfrom = Vec3::new(0.0, 0.0, 0.0);
+    let lookat = Vec3::new(0.0, 0.0, -1.0);
+
     initialize_camera(
         &mut camera_center,
         &mut pixel_delta_u,
         &mut pixel_delta_v,
         &mut pixel00_loc,
+        &lookfrom,
+        &lookat,
         90.0,
     );
 
@@ -117,12 +132,14 @@ fn main() {
     world.add(Box::new(Sphere::new(
         &Vec3::new(0.0, 0.0, -1.0),
         0.5,
-        Box::new(Metal::new(&Vec3::new(0.8, 0.6, 0.2), 0.3)),
+        Box::new(Lambertian::new_texture(Arc::new(
+            ImageTexture::new(&(current_path + "road.png")).expect("Could not load texture"),
+        ))),
     )));
     world.add(Box::new(Sphere::new(
         &Vec3::new(0.0, -100.5, -1.0),
         100.0,
-        Box::new(Lambertian::new(&Vec3::new(0.8, 0.8, 0.0))),
+        Box::new(Metal::new(&Vec3::new(0.8, 0.6, 0.2), 0.3)),
     )));
 
     let mut rng = XorShiftRng::from_seed([
@@ -171,6 +188,8 @@ fn main() {
             &mut pixel_delta_u,
             &mut pixel_delta_v,
             &mut pixel00_loc,
+            &lookfrom,
+            &lookat,
             90.0,
         );
 
@@ -183,25 +202,30 @@ fn initialize_camera(
     pixel_delta_u: &mut Vec3,
     pixel_delta_v: &mut Vec3,
     pixel00_loc: &mut Vec3,
+    lookfrom: &Vec3,
+    lookat: &Vec3,
     vfov: f64,
 ) {
+    *camera_center = lookfrom.clone();
+
+    let focal_length = (*lookfrom - *lookat).length();
     let theta = degrees_to_radians(vfov);
     let h = (theta / 2.0).tan();
-    let viewport_height = 2.0 * h * 1.0;
-    let viewport_width: f64 =
-        viewport_height * (pixel_buffer::WIDTH as f64 / pixel_buffer::HEIGHT as f64);
+    let viewport_height = 2.0 * h * focal_length;
+    let viewport_width = viewport_height * (pixel_buffer::WIDTH as f64 / pixel_buffer::HEIGHT as f64);
 
-    let focal_length = 1.0;
-    *camera_center = Vec3::new(0.0, 0.0, 0.0);
+    let w = (*lookfrom - *lookat).unit_vector();
+    let u = cross(Vec3::new(0.0, 1.0, 0.0), w).unit_vector();
+    let v = cross(w, u);
 
-    let viewport_u = Vec3::new(viewport_width, 0.0, 0.0);
-    let viewport_v = Vec3::new(0.0, -viewport_height, 0.0);
+    let viewport_u = viewport_width * u;
+    let viewport_v = viewport_height * -v;
 
     *pixel_delta_u = viewport_u / (pixel_buffer::WIDTH as f64);
     *pixel_delta_v = viewport_v / (pixel_buffer::HEIGHT as f64);
 
     let viewport_upper_left =
-        *camera_center - Vec3::new(0.0, 0.0, focal_length) - viewport_u / 2.0 - viewport_v / 2.0;
+        *camera_center - (focal_length * w) - viewport_u / 2.0 - viewport_v / 2.0;
     *pixel00_loc = viewport_upper_left + 0.5 * (*pixel_delta_u + *pixel_delta_v);
 }
 
@@ -396,6 +420,8 @@ fn update_screen(
     pixel_delta_u: &mut Vec3,
     pixel_delta_v: &mut Vec3,
     pixel00_loc: &mut Vec3,
+    lookfrom: &Vec3,
+    lookat: &Vec3,
     vfov: f64,
 ) {
     // Clear the canvas
@@ -437,6 +463,27 @@ fn update_screen(
         pixel_delta_u,
         pixel_delta_v,
         pixel00_loc,
+        lookfrom,
+        lookat,
         vfov,
     );
+}
+
+pub fn get_executable_directory() -> String {
+    let exe_path: std::path::PathBuf =
+        std::env::current_exe().expect("Failed to retrieve the path of the executable");
+    let exe_dir: &std::path::Path = exe_path
+        .parent()
+        .expect("Failed to get parent directory of the executable")
+        .parent()
+        .expect("Failed to get parent directory of the executable")
+        .parent()
+        .expect("Failed to get parent directory of the executable");
+    let dir_str: &str = exe_dir
+        .to_str()
+        .expect("Failed to convert directory path to string");
+
+    let mut dir_string: String = dir_str.to_string();
+    dir_string.push_str("/assets/");
+    dir_string
 }

@@ -1,22 +1,29 @@
+use std::{rc::Rc, sync::Arc};
+
 use rand_xorshift::XorShiftRng;
 
 use crate::{
     hittable::base::HitRecord,
     ray::Ray,
+    texture::{base::Texture, solid_color::SolidColor},
     vector::{random_unit_vector, Vec3},
 };
 
 use super::base::Material;
 
 pub struct Lambertian {
-    albedo: Vec3,
+    albedo: Arc<dyn Texture>,
 }
 
 impl Lambertian {
-    pub fn new(color: &Vec3) -> Lambertian {
+    pub fn new_color(color: &Vec3) -> Lambertian {
         Lambertian {
-            albedo: color.clone(),
+            albedo: Arc::new(SolidColor::new_vector(color)),
         }
+    }
+
+    pub fn new_texture(albedo: Arc<dyn Texture>) -> Lambertian {
+        Lambertian { albedo }
     }
 }
 
@@ -36,13 +43,13 @@ impl Material for Lambertian {
         }
 
         *scattered = Ray::new(&rec.point, &scatter_direction);
-        *attenuation = self.albedo;
+        *attenuation = self.albedo.value(rec.u, rec.v, rec.point);
         return true;
     }
 
     fn clone(&self) -> Box<dyn Material> {
         Box::new(Lambertian {
-            albedo: self.albedo,
+            albedo: self.albedo.clone(),
         })
     }
 }

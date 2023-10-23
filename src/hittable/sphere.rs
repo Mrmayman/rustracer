@@ -27,6 +27,26 @@ impl Sphere {
             bbox: AABB::new_point(&(*center + radius_vector), &(*center - radius_vector)),
         }
     }
+
+    pub fn get_sphere_uv(p: &Vec3, u: &mut f64, v: &mut f64) {
+        // p: a given point on the sphere of radius one, centered at the origin.
+        // u: returned value [0,1] of angle around the Y axis from X=-1.
+        // v: returned value [0,1] of angle from Y=-1 to Y=+1.
+        //     <1 0 0> yields <0.50 0.50>       <-1  0  0> yields <0.00 0.50>
+        //     <0 1 0> yields <0.50 1.00>       < 0 -1  0> yields <0.50 0.00>
+        //     <0 0 1> yields <0.25 0.50>       < 0  0 -1> yields <0.75 0.50>
+
+        // let theta: f64 = f64::acos(-p.y());
+        // let phi: f64 = f64::atan2(-p.z(), p.x()) + std::f64::consts::PI;
+
+        let phi = p.z().atan2(p.x());
+        let theta = p.y().asin();
+        *u = 1.0 - (phi + std::f64::consts::PI) / (2.0 * std::f64::consts::PI);
+        *v = (theta + std::f64::consts::FRAC_PI_2) / std::f64::consts::PI;
+
+        // *u = phi / (2.0*std::f64::consts::PI);
+        // *v = theta / std::f64::consts::PI;
+    }
 }
 
 impl Hittable for Sphere {
@@ -55,6 +75,7 @@ impl Hittable for Sphere {
         rec.point = ray.at(rec.t);
         let outward_normal: Vec3 = (rec.point - self.center) / self.radius;
         rec.set_face_normal(ray, &outward_normal);
+        Sphere::get_sphere_uv(&outward_normal, &mut rec.u, &mut rec.v);
         rec.mat = self.mat.clone();
 
         true
@@ -65,6 +86,11 @@ impl Hittable for Sphere {
     }
 
     fn clone(&self) -> Box<dyn Hittable> {
-        Box::new(Sphere {center: self.center, radius: self.radius, mat: self.mat.clone(), bbox: self.bbox.clone()})
+        Box::new(Sphere {
+            center: self.center,
+            radius: self.radius,
+            mat: self.mat.clone(),
+            bbox: self.bbox.clone(),
+        })
     }
 }
