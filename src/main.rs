@@ -7,6 +7,7 @@ This wouldn't have been made without them.
 extern crate sdl2;
 
 use hittable::base::{HitRecord, Hittable};
+use hittable::bvh_node::BvhNode;
 use hittable::hittable_list::HittableList;
 use hittable::sphere::Sphere;
 use interval::Interval;
@@ -40,11 +41,13 @@ mod pixel_buffer;
 mod ray;
 mod utils;
 mod vector;
+mod aabb;
 
 mod hittable {
     pub mod base;
     pub mod hittable_list;
     pub mod sphere;
+    pub mod bvh_node;
 }
 
 mod material {
@@ -121,6 +124,13 @@ fn main() {
         100.0,
         Box::new(Lambertian::new(&Vec3::new(0.8, 0.8, 0.0))),
     )));
+
+    let mut rng = XorShiftRng::from_seed([
+        0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+        0x88,
+    ]);
+
+    world = HittableList::new_add(Box::new(BvhNode::new_list(&world, &mut rng)));
 
     let shared_vec = Arc::new(buffers);
     let shared_world = Arc::new(world);

@@ -1,8 +1,11 @@
-use std::{rc::Rc, sync::Arc, cell::RefCell};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use crate::{
+    aabb::AABB,
+    interval::Interval,
+    material::base::Material,
     ray::Ray,
-    vector::{dot, Vec3}, interval::Interval, material::base::Material,
+    vector::{dot, Vec3},
 };
 
 use super::base::{HitRecord, Hittable};
@@ -11,14 +14,17 @@ pub struct Sphere {
     center: Vec3,
     radius: f64,
     mat: Box<dyn Material>,
+    bbox: AABB,
 }
 
 impl Sphere {
     pub fn new(center: &Vec3, radius: f64, mat: Box<dyn Material>) -> Sphere {
+        let radius_vector = Vec3::new(radius, radius, radius);
         Sphere {
             center: *center,
             radius,
-            mat
+            mat,
+            bbox: AABB::new_point(&(*center + radius_vector), &(*center - radius_vector)),
         }
     }
 }
@@ -52,5 +58,13 @@ impl Hittable for Sphere {
         rec.mat = self.mat.clone();
 
         true
+    }
+
+    fn bounding_box(&self) -> AABB {
+        self.bbox.clone()
+    }
+
+    fn clone(&self) -> Box<dyn Hittable> {
+        Box::new(Sphere {center: self.center, radius: self.radius, mat: self.mat.clone(), bbox: self.bbox.clone()})
     }
 }

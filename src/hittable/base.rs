@@ -4,7 +4,7 @@ use crate::{
     interval::Interval,
     material::{base::Material, lambertian::Lambertian},
     ray::Ray,
-    vector::{dot, Vec3},
+    vector::{dot, Vec3}, aabb::AABB,
 };
 
 pub struct HitRecord {
@@ -48,4 +48,6 @@ impl HitRecord {
 
 pub trait Hittable {
     fn hit(&self, ray: &Ray, ray_t: &Interval, rec: &mut HitRecord) -> bool;
+    fn bounding_box(&self) -> AABB;
+    fn clone(&self) -> Box<dyn Hittable>;
 }
