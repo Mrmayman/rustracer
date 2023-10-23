@@ -1,9 +1,8 @@
+use rand_xorshift::XorShiftRng;
 use std::fmt;
 use std::ops::{Add, Div, Mul, Sub};
 
-use rand_xorshift::XorShiftRng;
-
-use crate::utils::{random_double_range, random_double};
+use crate::random::{random_double, random_double_range};
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Vec3 {
@@ -55,13 +54,6 @@ impl Vec3 {
         *self / self.length()
     }
 
-    pub fn near_zero(&self) -> bool {
-        let low_value: f64 = 1e-8;
-        (self.e[0].abs() < low_value)
-            && (self.e[1].abs() < low_value)
-            && (self.e[2].abs() < low_value)
-    }
-
     pub fn random(rng: &mut XorShiftRng) -> Vec3 {
         Vec3::new(random_double(rng), random_double(rng), random_double(rng))
     }
@@ -72,6 +64,13 @@ impl Vec3 {
             random_double_range(min, max, rng),
             random_double_range(min, max, rng),
         )
+    }
+
+    pub fn near_zero(&self) -> bool {
+        let low_value: f64 = 1e-8;
+        (self.e[0].abs() < low_value)
+            && (self.e[1].abs() < low_value)
+            && (self.e[2].abs() < low_value)
     }
 }
 
@@ -187,17 +186,6 @@ pub fn cross(u: Vec3, v: Vec3) -> Vec3 {
     }
 }
 
-pub fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
-    *v - 2.0 * dot(v, n) * (*n)
-}
-
-pub fn refract(uv: &Vec3, n: &Vec3, etai_over_etat: f64) -> Vec3 {
-    let cos_theta: f64 = f64::min(dot(&(-(*uv)), n), 1.0);
-    let r_out_perp: Vec3 = etai_over_etat * ((*uv) + cos_theta * (*n));
-    let r_out_parallel: Vec3 = -((1.0 - r_out_perp.length_squared()).abs().sqrt()) * (*n);
-    return r_out_perp + r_out_parallel;
-}
-
 pub fn random_in_unit_sphere(rng: &mut XorShiftRng) -> Vec3 {
     loop {
         // Keep creating new vectors until we find one inside unit sphere
@@ -218,5 +206,29 @@ pub fn random_on_hemisphere(normal: Vec3, rng: &mut XorShiftRng) -> Vec3 {
         return on_unit_sphere;
     } else {
         return -on_unit_sphere;
+    }
+}
+
+pub fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
+    *v - 2.0 * dot(v, n) * (*n)
+}
+
+pub fn refract(uv: &Vec3, n: &Vec3, etai_over_etat: f64) -> Vec3 {
+    let cos_theta: f64 = f64::min(dot(&(-(*uv)), n), 1.0);
+    let r_out_perp: Vec3 = etai_over_etat * ((*uv) + cos_theta * (*n));
+    let r_out_parallel: Vec3 = -((1.0 - r_out_perp.length_squared()).abs().sqrt()) * (*n);
+    return r_out_perp + r_out_parallel;
+}
+
+pub fn random_in_unit_disk(rng: &mut XorShiftRng) -> Vec3 {
+    loop {
+        let p = Vec3::new(
+            random_double_range(-1.0, 1.0, rng),
+            random_double_range(-1.0, 1.0, rng),
+            0.0,
+        );
+        if p.length_squared() < 1.0 {
+            return p;
+        }
     }
 }
