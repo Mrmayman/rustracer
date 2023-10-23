@@ -9,6 +9,7 @@ extern crate sdl2;
 use hittable::base::{HitRecord, Hittable};
 use hittable::bvh_node::BvhNode;
 use hittable::hittable_list::HittableList;
+use hittable::quad::Quad;
 use hittable::sphere::Sphere;
 use interval::Interval;
 use material::lambertian::Lambertian;
@@ -26,8 +27,9 @@ use sdl2::video::Window;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use texture::image_texture::ImageTexture;
+use texture::solid_color::SolidColor;
 use utils::{degrees_to_radians, random_double};
-use vector::{Vec3, cross};
+use vector::{cross, Vec3};
 
 const SCREEN_WIDTH: u32 = 800;
 const SCREEN_HEIGHT: u32 = 600;
@@ -55,6 +57,7 @@ mod hittable {
     pub mod base;
     pub mod bvh_node;
     pub mod hittable_list;
+    pub mod quad;
     pub mod sphere;
 }
 
@@ -113,7 +116,7 @@ fn main() {
     let mut camera_center: Vec3 = Vec3::new_default();
     let mut pixel00_loc: Vec3 = Vec3::new_default();
 
-    let lookfrom = Vec3::new(0.0, 0.0, 0.0);
+    let lookfrom = Vec3::new(1.0, 0.0, 0.0);
     let lookat = Vec3::new(0.0, 0.0, -1.0);
 
     initialize_camera(
@@ -140,6 +143,12 @@ fn main() {
         &Vec3::new(0.0, -100.5, -1.0),
         100.0,
         Box::new(Metal::new(&Vec3::new(0.8, 0.6, 0.2), 0.3)),
+    )));
+    world.add(Box::new(Quad::new(
+        Vec3::new(0.0, 0.0, -1.0),
+        Vec3::new(0.0, 1.0, 0.0),
+        Vec3::new(1.0, 0.0, 0.0),
+        Box::new(Lambertian::new_color(&Vec3::new(0.0, 1.0, 0.0))),
     )));
 
     let mut rng = XorShiftRng::from_seed([
@@ -212,7 +221,8 @@ fn initialize_camera(
     let theta = degrees_to_radians(vfov);
     let h = (theta / 2.0).tan();
     let viewport_height = 2.0 * h * focal_length;
-    let viewport_width = viewport_height * (pixel_buffer::WIDTH as f64 / pixel_buffer::HEIGHT as f64);
+    let viewport_width =
+        viewport_height * (pixel_buffer::WIDTH as f64 / pixel_buffer::HEIGHT as f64);
 
     let w = (*lookfrom - *lookat).unit_vector();
     let u = cross(Vec3::new(0.0, 1.0, 0.0), w).unit_vector();
