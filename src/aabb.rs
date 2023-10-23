@@ -1,39 +1,39 @@
 use crate::{interval::Interval, ray::Ray, vector::Vec3};
 
 #[derive(Clone)]
-pub struct AABB {
+pub struct Aabb {
     pub x: Interval,
     pub y: Interval,
     pub z: Interval,
 }
 
-impl AABB {
-    pub fn new() -> AABB {
-        AABB {
+impl Aabb {
+    pub fn new() -> Aabb {
+        Aabb {
             x: Interval::new(0.0, 0.0),
             y: Interval::new(0.0, 0.0),
             z: Interval::new(0.0, 0.0),
         }
     }
 
-    pub fn new_point(a: &Vec3, b: &Vec3) -> AABB {
-        AABB {
+    pub fn new_point(a: &Vec3, b: &Vec3) -> Aabb {
+        Aabb {
             x: Interval::new(f64::min(a.x(), b.x()), f64::max(a.x(), b.x())),
             y: Interval::new(f64::min(a.y(), b.y()), f64::max(a.y(), b.y())),
             z: Interval::new(f64::min(a.z(), b.z()), f64::max(a.z(), b.z())),
         }
     }
 
-    pub fn new_interval(ix: Interval, iy: Interval, iz: Interval) -> AABB {
-        AABB {
+    pub fn new_interval(ix: Interval, iy: Interval, iz: Interval) -> Aabb {
+        Aabb {
             x: ix,
             y: iy,
             z: iz,
         }
     }
 
-    pub fn new_aabb(box0: &AABB, box1: &AABB) -> AABB {
-        AABB {
+    pub fn new_aabb(box0: &Aabb, box1: &Aabb) -> Aabb {
+        Aabb {
             x: Interval::new_interval(&box0.x, &box1.x),
             y: Interval::new_interval(&box0.y, &box1.y),
             z: Interval::new_interval(&box0.z, &box1.z),
@@ -47,7 +47,8 @@ impl AABB {
         if axis == 1 {
             return self.y;
         }
-        return self.x;
+
+        self.x
     }
 
     pub fn hit(&self, ray: &Ray, mut ray_t: Interval) -> bool {
@@ -71,16 +72,14 @@ impl AABB {
 
         // Optimized hit method by Andrew Kensler at Pixar.
         for a in 0..3 {
-            let invD: f64 = 1.0 / ray.direction[a];
+            let inv_d: f64 = 1.0 / ray.direction[a];
             let orig: f64 = ray.origin[a];
 
-            let mut t0 = (self.axis(a as i32).min - orig) * invD;
-            let mut t1 = (self.axis(a as i32).max - orig) * invD;
+            let mut t0 = (self.axis(a as i32).min - orig) * inv_d;
+            let mut t1 = (self.axis(a as i32).max - orig) * inv_d;
 
-            if invD < 0.0 {
-                let t2 = t1;
-                t1 = t0;
-                t0 = t2;
+            if inv_d < 0.0 {
+                std::mem::swap(&mut t1, &mut t0);
             }
 
             if t0 > ray_t.min {
@@ -94,39 +93,37 @@ impl AABB {
                 return false;
             }
         }
-        return true;
+
+        true
     }
 
-    pub fn pad(&self) -> AABB {
+    pub fn pad(&self) -> Aabb {
         // Return an AABB that has no side narrower than some delta, padding if necessary.
         let delta: f64 = 0.0001;
-        let new_x: Interval;
-        if self.x.size() >= delta {
-            new_x = self.x;
+        let new_x: Interval = if self.x.size() >= delta {
+            self.x
         } else {
-            new_x = self.x.expand(delta);
-        }
-        let new_y: Interval;
-        if self.y.size() >= delta {
-            new_y = self.y;
+            self.x.expand(delta)
+        };
+        let new_y: Interval = if self.y.size() >= delta {
+            self.y
         } else {
-            new_y = self.y.expand(delta);
-        }
-        let new_z: Interval;
-        if self.z.size() >= delta {
-            new_z = self.z;
+            self.y.expand(delta)
+        };
+        let new_z: Interval = if self.z.size() >= delta {
+            self.z
         } else {
-            new_z = self.z.expand(delta);
-        }
+            self.z.expand(delta)
+        };
 
-        AABB::new_interval(new_x, new_y, new_z)
+        Aabb::new_interval(new_x, new_y, new_z)
     }
 }
 
-impl std::ops::Add<Vec3> for AABB {
-    type Output = AABB;
-    fn add(self, rhs: Vec3) -> AABB {
-        AABB {
+impl std::ops::Add<Vec3> for Aabb {
+    type Output = Aabb;
+    fn add(self, rhs: Vec3) -> Aabb {
+        Aabb {
             x: self.x + rhs.x(),
             y: self.y + rhs.y(),
             z: self.z + rhs.z(),

@@ -98,13 +98,13 @@ fn main() {
     let mut event_pump: sdl2::EventPump = sdl_context.event_pump().unwrap();
     let mut quit: bool = false;
 
-    let mut delta_start_time: Instant = Instant::now();
+    let delta_start_time: Instant = Instant::now();
 
     let mut mouse_locked = false;
     let mut mouse_x = 0;
     let mut mouse_y = 0;
 
-    let size = (pixel_buffer::WIDTH * pixel_buffer::HEIGHT * 4) / THREAD_ROWS as usize;
+    let size = (pixel_buffer::WIDTH * pixel_buffer::HEIGHT * 4) / THREAD_ROWS;
     let mut buffers: Vec<Mutex<Box<[u8]>>> = vec![];
     for _i in 0..THREAD_ROWS {
         buffers.push(Mutex::new(vec![0; size].into_boxed_slice()));
@@ -124,8 +124,8 @@ fn main() {
         &mut pixel_delta_u,
         &mut pixel_delta_v,
         &mut pixel00_loc,
-        &lookfrom,
-        &lookat,
+        lookfrom,
+        lookat,
         90.0,
     );
 
@@ -142,13 +142,13 @@ fn main() {
     world.add(Box::new(Sphere::new(
         &Vec3::new(0.0, -100.5, -1.0),
         100.0,
-        Box::new(Metal::new(&Vec3::new(0.8, 0.6, 0.2), 0.3)),
+        Box::new(Metal::new(Vec3::new(0.8, 0.6, 0.2), 0.3)),
     )));
     world.add(Box::new(Quad::new(
         Vec3::new(0.0, 0.0, -1.0),
         Vec3::new(0.0, 1.0, 0.0),
         Vec3::new(1.0, 0.0, 0.0),
-        Box::new(Lambertian::new_color(&Vec3::new(0.0, 1.0, 0.0))),
+        Box::new(Lambertian::new_color(Vec3::new(0.0, 1.0, 0.0))),
     )));
 
     let mut rng = XorShiftRng::from_seed([
@@ -197,8 +197,8 @@ fn main() {
             &mut pixel_delta_u,
             &mut pixel_delta_v,
             &mut pixel00_loc,
-            &lookfrom,
-            &lookat,
+            lookfrom,
+            lookat,
             90.0,
         );
 
@@ -211,20 +211,20 @@ fn initialize_camera(
     pixel_delta_u: &mut Vec3,
     pixel_delta_v: &mut Vec3,
     pixel00_loc: &mut Vec3,
-    lookfrom: &Vec3,
-    lookat: &Vec3,
+    lookfrom: Vec3,
+    lookat: Vec3,
     vfov: f64,
 ) {
-    *camera_center = lookfrom.clone();
+    *camera_center = lookfrom;
 
-    let focal_length = (*lookfrom - *lookat).length();
+    let focal_length = (lookfrom - lookat).length();
     let theta = degrees_to_radians(vfov);
     let h = (theta / 2.0).tan();
     let viewport_height = 2.0 * h * focal_length;
     let viewport_width =
         viewport_height * (pixel_buffer::WIDTH as f64 / pixel_buffer::HEIGHT as f64);
 
-    let w = (*lookfrom - *lookat).unit_vector();
+    let w = (lookfrom - lookat).unit_vector();
     let u = cross(Vec3::new(0.0, 1.0, 0.0), w).unit_vector();
     let v = cross(w, u);
 
@@ -272,7 +272,7 @@ fn render_loop(
                         camera_center,
                         &mut rng,
                     );
-                    pixel_color = pixel_color + ray_color(&ray, MAX_DEPTH, &*world_clone, &mut rng);
+                    pixel_color = pixel_color + ray_color(&ray, MAX_DEPTH, &world_clone, &mut rng);
                 }
                 write_color(&arc_clone, x, y, pixel_color, SAMPLES, &i);
             }
@@ -295,13 +295,14 @@ fn get_ray(
     let ray_origin = camera_center;
     let ray_direction = pixel_sample - ray_origin;
 
-    Ray::new(&camera_center, &ray_direction)
+    Ray::new(camera_center, ray_direction)
 }
 
 fn pixel_sample_square(rng: &mut XorShiftRng, pixel_delta_u: &Vec3, pixel_delta_v: &Vec3) -> Vec3 {
     let px = -0.5 + random_double(rng);
     let py = -0.5 + random_double(rng);
-    return (px * *pixel_delta_u) + (py * *pixel_delta_v);
+
+    (px * *pixel_delta_u) + (py * *pixel_delta_v)
 }
 
 fn ray_color(r: &Ray, depth: i32, world: &HittableList, rng: &mut XorShiftRng) -> Vec3 {
@@ -316,7 +317,7 @@ fn ray_color(r: &Ray, depth: i32, world: &HittableList, rng: &mut XorShiftRng) -
         &Interval::new(0.001, std::f64::INFINITY),
         &mut hit_record,
     ) {
-        let mut scattered: Ray = Ray::new(&Vec3::new_default(), &Vec3::new_default());
+        let mut scattered: Ray = Ray::new(Vec3::new_default(), Vec3::new_default());
         let mut attenuation: Vec3 = Vec3::new_default();
         if hit_record
             .mat
@@ -361,9 +362,9 @@ fn write_color(
     b = linear_to_gamma(b);
 
     pixel_buffer::set(
-        &mut *arc_clone[*i].lock().expect("Could not lock screen mutex"),
-        x as usize,
-        y as usize % (pixel_buffer::HEIGHT / THREAD_ROWS),
+        &mut arc_clone[*i].lock().expect("Could not lock screen mutex"),
+        x,
+        y % (pixel_buffer::HEIGHT / THREAD_ROWS),
         (r * 255.0) as u8,
         (g * 255.0) as u8,
         (b * 255.0) as u8,
@@ -423,15 +424,15 @@ fn calculate_delta_time(delta_start_time: &mut Instant) -> f64 {
 }
 
 fn update_screen(
-    texture: &mut Vec<sdl2::render::Texture<'_>>,
-    camera: &Vec<Mutex<Box<[u8]>>>,
+    texture: &mut [sdl2::render::Texture<'_>],
+    pixelbuffer: &[Mutex<Box<[u8]>>],
     canvas: &mut Canvas<Window>,
     camera_center: &mut Vec3,
     pixel_delta_u: &mut Vec3,
     pixel_delta_v: &mut Vec3,
     pixel00_loc: &mut Vec3,
-    lookfrom: &Vec3,
-    lookat: &Vec3,
+    lookfrom: Vec3,
+    lookat: Vec3,
     vfov: f64,
 ) {
     // Clear the canvas
@@ -441,12 +442,10 @@ fn update_screen(
         texture[i]
             .update(
                 None,
-                &(*pixel_buffer::get_pixels(
-                    &camera[i]
-                        .lock()
-                        .expect("Could not lock mutex for updating texture"),
-                )),
-                pixel_buffer::WIDTH as usize * 4,
+                &pixelbuffer[i]
+                    .lock()
+                    .expect("Could not lock mutex for updating texture"),
+                pixel_buffer::WIDTH * 4,
             )
             .expect("Could not convert viewbuffer into texture");
 

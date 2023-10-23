@@ -24,7 +24,7 @@ impl Interval {
 
     pub fn expand(&self, delta: f64) -> Interval {
         let padding: f64 = delta/2.0;
-        return Interval::new(self.min - padding, self.max + padding);
+        Interval::new(self.min - padding, self.max + padding)
     }
 
     pub fn contains(&self, x: f64) -> bool {
@@ -42,7 +42,7 @@ impl Interval {
         if x > self.max {
             return self.max;
         }
-        return x;
+        x
     }
 
     pub fn size(&self) -> f64 {

@@ -1,10 +1,8 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc};
-
 use crate::{
     interval::Interval,
     material::{base::Material, lambertian::Lambertian},
     ray::Ray,
-    vector::{dot, Vec3}, aabb::AABB,
+    vector::{dot, Vec3}, aabb::Aabb,
 };
 
 pub struct HitRecord {
@@ -25,17 +23,17 @@ impl HitRecord {
             t: 0.0,
             u: 0.0,
             v: 0.0,
-            mat: Box::new(Lambertian::new_color(&Vec3::new(1.0, 0.0, 1.0))),
+            mat: Box::new(Lambertian::new_color(Vec3::new(1.0, 0.0, 1.0))),
             front_face: false,
         }
     }
 
-    pub fn set_face_normal(&mut self, ray: &Ray, outward_normal: &Vec3) {
-        self.front_face = dot(&ray.direction, &outward_normal) < 0.0;
+    pub fn set_face_normal(&mut self, ray: &Ray, outward_normal: Vec3) {
+        self.front_face = dot(ray.direction, outward_normal) < 0.0;
         if self.front_face {
-            self.normal = outward_normal.clone();
+            self.normal = outward_normal;
         } else {
-            self.normal = -outward_normal.clone();
+            self.normal = -outward_normal;
         }
     }
 
@@ -54,6 +52,6 @@ impl HitRecord {
 
 pub trait Hittable {
     fn hit(&self, ray: &Ray, ray_t: &Interval, rec: &mut HitRecord) -> bool;
-    fn bounding_box(&self) -> AABB;
+    fn bounding_box(&self) -> Aabb;
     fn clone(&self) -> Box<dyn Hittable>;
 }

@@ -1,7 +1,5 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc};
-
 use crate::{
-    aabb::AABB,
+    aabb::Aabb,
     interval::Interval,
     material::base::Material,
     ray::Ray,
@@ -14,7 +12,7 @@ pub struct Sphere {
     center: Vec3,
     radius: f64,
     mat: Box<dyn Material>,
-    bbox: AABB,
+    bbox: Aabb,
 }
 
 impl Sphere {
@@ -24,7 +22,7 @@ impl Sphere {
             center: *center,
             radius,
             mat,
-            bbox: AABB::new_point(&(*center + radius_vector), &(*center - radius_vector)),
+            bbox: Aabb::new_point(&(*center + radius_vector), &(*center - radius_vector)),
         }
     }
 
@@ -53,7 +51,7 @@ impl Hittable for Sphere {
     fn hit(&self, ray: &Ray, ray_t: &Interval, rec: &mut HitRecord) -> bool {
         let oc: Vec3 = ray.origin - self.center;
         let a = ray.direction.length_squared();
-        let half_b = dot(&oc, &ray.direction);
+        let half_b = dot(oc, ray.direction);
         let c = oc.length_squared() - self.radius * self.radius;
 
         let discriminant = half_b * half_b - a * c;
@@ -74,14 +72,14 @@ impl Hittable for Sphere {
         rec.t = root;
         rec.point = ray.at(rec.t);
         let outward_normal: Vec3 = (rec.point - self.center) / self.radius;
-        rec.set_face_normal(ray, &outward_normal);
+        rec.set_face_normal(ray, outward_normal);
         Sphere::get_sphere_uv(&outward_normal, &mut rec.u, &mut rec.v);
         rec.mat = self.mat.clone();
 
         true
     }
 
-    fn bounding_box(&self) -> AABB {
+    fn bounding_box(&self) -> Aabb {
         self.bbox.clone()
     }
 

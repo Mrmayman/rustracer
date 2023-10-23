@@ -7,9 +7,9 @@ pub struct SolidColor {
 }
 
 impl SolidColor {
-    pub fn new_vector(color: &Vec3) -> SolidColor {
+    pub fn new_vector(color: Vec3) -> SolidColor {
         SolidColor {
-            color: color.clone(),
+            color,
         }
     }
 

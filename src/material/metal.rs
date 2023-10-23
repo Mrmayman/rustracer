@@ -14,9 +14,9 @@ pub struct Metal {
 }
 
 impl Metal {
-    pub fn new(color: &Vec3, fuzz: f64) -> Metal {
+    pub fn new(color: Vec3, fuzz: f64) -> Metal {
         Metal {
-            albedo: color.clone(),
+            albedo: color,
             fuzz
         }
     }
@@ -31,10 +31,10 @@ impl Material for Metal {
         scattered: &mut Ray,
         rng: &mut XorShiftRng,
     ) -> bool {
-        let reflected: Vec3 = reflect(&r_in.direction.unit_vector(), &rec.normal);
-        *scattered = Ray::new(&rec.point, &(reflected + (self.fuzz * random_unit_vector(rng))));
+        let reflected: Vec3 = reflect(r_in.direction.unit_vector(), rec.normal);
+        *scattered = Ray::new(rec.point, reflected + (self.fuzz * random_unit_vector(rng)));
         *attenuation = self.albedo;
-        return true;
+        true
     }
 
     fn clone(&self) -> Box<dyn Material> {

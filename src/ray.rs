@@ -6,11 +6,8 @@ pub struct Ray {
 }
 
 impl Ray {
-    pub fn new(origin: &Vec3, direction: &Vec3) -> Ray {
-        Ray {
-            origin: origin.clone(),
-            direction: direction.clone()
-        }
+    pub fn new(origin: Vec3, direction: Vec3) -> Ray {
+        Ray { origin, direction }
     }
 
     pub fn at(&self, t: f64) -> Vec3 {

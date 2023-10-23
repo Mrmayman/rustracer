@@ -30,14 +30,14 @@ fn calculate_contrast(rgb1: (u8, u8, u8), rgb2: (u8, u8, u8)) -> f64 {
     f64::max(r_contrast, f64::max(g_contrast, b_contrast))
 }
 
-pub fn get_contrast(p: &Box<[u8]>, x1: usize, y1: usize, x2: usize, y2: usize) -> f64 {
+pub fn get_contrast(p: &[u8], x1: usize, y1: usize, x2: usize, y2: usize) -> f64 {
     if x1 > WIDTH || x2 > WIDTH {
         return 1.0;
     }
     calculate_contrast(get_pixel(p, x1, y1), get_pixel(p, x2, y2))
 }
 
-pub fn get_pixel(p: &Box<[u8]>, x: usize, y: usize) -> (u8, u8, u8) {
+pub fn get_pixel(p: &[u8], x: usize, y: usize) -> (u8, u8, u8) {
     if y > HEIGHT {
         panic!("Tried to get pixel outside bottom screen edge");
     }
@@ -57,10 +57,6 @@ pub fn set_color(p: &mut Box<[u8]>, x: usize, y: usize, color: &Vec3) {
         (color.y() * 255.0) as u8,
         (color.z() * 255.0) as u8,
     )
-}
-
-pub fn get_pixels(p: &Box<[u8]>) -> &[u8] {
-    &p
 }
 
 pub fn average(

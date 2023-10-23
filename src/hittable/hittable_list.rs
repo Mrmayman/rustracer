@@ -1,10 +1,10 @@
-use crate::{ray::Ray, interval::Interval, aabb::AABB};
+use crate::{ray::Ray, interval::Interval, aabb::Aabb};
 
 use super::base::{HitRecord, Hittable};
 
 pub struct HittableList {
     pub objects: Vec<Box<dyn Hittable>>,
-    bbox: AABB,
+    bbox: Aabb,
 }
 
 unsafe impl Sync for HittableList {}
@@ -12,7 +12,7 @@ unsafe impl Send for HittableList {}
 
 impl HittableList {
     pub fn new() -> HittableList {
-        HittableList { objects: vec![], bbox: AABB::new() }
+        HittableList { objects: vec![], bbox: Aabb::new() }
     }
 
     pub fn new_add(object: Box<dyn Hittable>) -> HittableList {
@@ -26,7 +26,7 @@ impl HittableList {
     }
 
     pub fn add(&mut self, object: Box<dyn Hittable>) {
-        self.bbox = AABB::new_aabb(&self.bbox, &object.bounding_box());
+        self.bbox = Aabb::new_aabb(&self.bbox, &object.bounding_box());
         self.objects.push(object);
     }
 
@@ -57,10 +57,10 @@ impl Hittable for HittableList {
             }
         }
 
-        return hit_anything;
+        hit_anything
     }
 
-    fn bounding_box(&self) -> AABB {
+    fn bounding_box(&self) -> Aabb {
         self.bbox.clone()
     }
 

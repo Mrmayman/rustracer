@@ -26,7 +26,7 @@ impl ImageTexture {
     pub fn new(file_path: &str) -> Result<ImageTexture, String> {
         println!("Started loading image");
         // Load the image from file
-        let image = match image::open(&Path::new(file_path)) {
+        let image = match image::open(Path::new(file_path)) {
             Ok(image) => image,
             Err(err) => return Err(format!("Failed to open image: {}", err)),
         };

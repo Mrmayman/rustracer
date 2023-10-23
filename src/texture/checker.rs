@@ -15,7 +15,7 @@ impl Checker {
         Checker { scale, even, odd }
     }
 
-    pub fn new_color(scale: f64, even: &Vec3, odd: &Vec3) -> Checker {
+    pub fn new_color(scale: f64, even: Vec3, odd: Vec3) -> Checker {
         Checker {
             scale,
             even: Rc::new(SolidColor::new_vector(even)),
@@ -33,9 +33,9 @@ impl Texture for Checker {
         let is_even: bool = (x_integer + y_integer + z_integer) % 2 == 0;
 
         if is_even {
-            return self.even.value(u, v, p);
+            self.even.value(u, v, p)
         } else {
-            return self.odd.value(u, v, p);
+            self.odd.value(u, v, p)
         }
     }
 }

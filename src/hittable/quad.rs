@@ -1,7 +1,5 @@
-use std::sync::Arc;
-
 use crate::{
-    aabb::AABB,
+    aabb::Aabb,
     interval::Interval,
     material::base::Material,
     ray::Ray,
@@ -15,7 +13,7 @@ pub struct Quad {
     u: Vec3,
     v: Vec3,
     mat: Box<dyn Material>,
-    bbox: AABB,
+    bbox: Aabb,
     normal: Vec3,
     d: f64,
     w: Vec3,
@@ -23,7 +21,7 @@ pub struct Quad {
 
 impl Hittable for Quad {
     fn hit(&self, hit_ray: &Ray, ray_t: &Interval, hit_record: &mut HitRecord) -> bool {
-        let denom = dot(&self.normal, &hit_ray.direction);
+        let denom = dot(self.normal, hit_ray.direction);
 
         // No hit if the ray is parallel to the plane.
         if denom.abs() < 1e-8 {
@@ -31,7 +29,7 @@ impl Hittable for Quad {
         }
 
         // Return false if the hit point parameter t is outside the ray interval.
-        let t = (self.d - dot(&self.normal, &hit_ray.origin)) / denom;
+        let t = (self.d - dot(self.normal, hit_ray.origin)) / denom;
         if !ray_t.contains(t) {
             return false;
         }
@@ -39,8 +37,8 @@ impl Hittable for Quad {
         // Determine the hit point lies within the planar shape using its plane coordinates.
         let intersection = hit_ray.at(t);
         let planar_hitpt_vector = intersection - self.q;
-        let alpha = dot(&self.w, &cross(planar_hitpt_vector, self.v));
-        let beta = dot(&self.w, &cross(self.u, planar_hitpt_vector));
+        let alpha = dot(self.w, cross(planar_hitpt_vector, self.v));
+        let beta = dot(self.w, cross(self.u, planar_hitpt_vector));
 
         if !Quad::is_interior(alpha, beta, hit_record) {
             return false;
@@ -50,12 +48,12 @@ impl Hittable for Quad {
         hit_record.t = t;
         hit_record.point = intersection;
         hit_record.mat = self.mat.clone();
-        hit_record.set_face_normal(hit_ray, &self.normal);
+        hit_record.set_face_normal(hit_ray, self.normal);
 
         true
     }
 
-    fn bounding_box(&self) -> AABB {
+    fn bounding_box(&self) -> Aabb {
         self.bbox.clone()
     }
 
@@ -75,7 +73,7 @@ impl Hittable for Quad {
 
 impl Quad {
     pub fn set_bounding_box(&mut self) {
-        self.bbox = AABB::new_point(&self.q, &(self.q + self.u + self.v)).pad();
+        self.bbox = Aabb::new_point(&self.q, &(self.q + self.u + self.v)).pad();
     }
 
     pub fn new(q: Vec3, u: Vec3, v: Vec3, mat: Box<dyn Material>) -> Quad {
@@ -86,10 +84,10 @@ impl Quad {
             u,
             v,
             mat,
-            bbox: AABB::new(),
+            bbox: Aabb::new(),
             normal,
-            d: dot(&normal, &q),
-            w: n / dot(&n, &n),
+            d: dot(normal, q),
+            w: n / dot(n, n),
         };
 
         temp_quad.set_bounding_box();
@@ -101,13 +99,13 @@ impl Quad {
         // Given the hit point in plane coordinates, return false if it is outside the
         // primitive, otherwise set the hit record UV coordinates and return true.
 
-        if (a < 0.0) || (1.0 < a) || (b < 0.0) || (1.0 < b) {
+        if !(0.0..=1.0).contains(&a) || !(0.0..=1.0).contains(&b) {
             return false;
         }
 
         rec.u = a;
         rec.v = b;
-        return true;
+        true
     }
 }
 

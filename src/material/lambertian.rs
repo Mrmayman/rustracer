@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 use rand_xorshift::XorShiftRng;
 
@@ -16,7 +16,7 @@ pub struct Lambertian {
 }
 
 impl Lambertian {
-    pub fn new_color(color: &Vec3) -> Lambertian {
+    pub fn new_color(color: Vec3) -> Lambertian {
         Lambertian {
             albedo: Arc::new(SolidColor::new_vector(color)),
         }
@@ -42,9 +42,10 @@ impl Material for Lambertian {
             scatter_direction = rec.normal;
         }
 
-        *scattered = Ray::new(&rec.point, &scatter_direction);
+        *scattered = Ray::new(rec.point, scatter_direction);
         *attenuation = self.albedo.value(rec.u, rec.v, rec.point);
-        return true;
+        
+        true
     }
 
     fn clone(&self) -> Box<dyn Material> {
