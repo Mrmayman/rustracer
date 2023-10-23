@@ -13,4 +13,6 @@ pub trait Material {
     ) -> bool;
 
     fn clone(&self) -> Box<dyn Material>;
+
+    fn emitted(&self, u: f64, v: f64, p: Vec3) -> Vec3;
 }

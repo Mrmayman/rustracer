@@ -43,4 +43,8 @@ impl Material for Metal {
             fuzz: self.fuzz
         })
     }
+
+    fn emitted(&self, u: f64, v: f64, p: Vec3) -> Vec3 {
+        Vec3::new_default()
+    }
 }

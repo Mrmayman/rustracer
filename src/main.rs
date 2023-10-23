@@ -12,6 +12,7 @@ use hittable::hittable_list::HittableList;
 use hittable::quad::Quad;
 use hittable::sphere::Sphere;
 use interval::Interval;
+use material::diffuse_light::DiffuseLight;
 use material::lambertian::Lambertian;
 use material::metal::Metal;
 use rand::SeedableRng;
@@ -63,6 +64,7 @@ mod hittable {
 
 mod material {
     pub mod base;
+    pub mod diffuse_light;
     pub mod lambertian;
     pub mod metal;
 }
@@ -148,7 +150,9 @@ fn main() {
         Vec3::new(0.0, 0.0, -1.0),
         Vec3::new(0.0, 1.0, 0.0),
         Vec3::new(1.0, 0.0, 0.0),
-        Box::new(Lambertian::new_color(Vec3::new(0.0, 1.0, 0.0))),
+        Box::new(DiffuseLight::new(Arc::new(SolidColor::new_vector(
+            Vec3::new(4.0, 4.0, 4.0),
+        )))),
     )));
 
     let mut rng = XorShiftRng::from_seed([
@@ -312,30 +316,37 @@ fn ray_color(r: &Ray, depth: i32, world: &HittableList, rng: &mut XorShiftRng) -
         return Vec3::new_default();
     }
 
-    if world.hit(
+    if !world.hit(
         r,
         &Interval::new(0.001, std::f64::INFINITY),
         &mut hit_record,
     ) {
-        let mut scattered: Ray = Ray::new(Vec3::new_default(), Vec3::new_default());
-        let mut attenuation: Vec3 = Vec3::new_default();
-        if hit_record
-            .mat
-            .scatter(r, &hit_record, &mut attenuation, &mut scattered, rng)
-        {
-            return attenuation * ray_color(&scattered, depth - 1, world, rng);
-        }
-        return Vec3::new(1.0, 0.0, 1.0);
+        // let sky_bottom_color: Vec3 = Vec3::new(1.0, 1.0, 1.0);
+        // let sky_top_color: Vec3 = Vec3::new(0.5, 0.7, 1.0);
+
+        let sky_bottom_color: Vec3 = Vec3::new(0.0, 0.1, 0.2);
+        let sky_top_color: Vec3 = Vec3::new(0.0, 0.0, 0.0);
+
+        let unit_direction: Vec3 = r.direction.unit_vector();
+        let a = 0.5 * (unit_direction.y() + 1.0);
+
+        // Linearly interpolate between bottom and top color
+        return (1.0 - a) * sky_bottom_color + a * sky_top_color;
     }
 
-    let sky_bottom_color: Vec3 = Vec3::new(1.0, 1.0, 1.0);
-    let sky_top_color: Vec3 = Vec3::new(0.5, 0.7, 1.0);
+    let mut scattered: Ray = Ray::new(Vec3::new_default(), Vec3::new_default());
+    let mut attenuation: Vec3 = Vec3::new_default();
+    let color_from_emission = hit_record
+        .mat
+        .emitted(hit_record.u, hit_record.v, hit_record.point);
 
-    let unit_direction: Vec3 = r.direction.unit_vector();
-    let a = 0.5 * (unit_direction.y() + 1.0);
-
-    // Linearly interpolate between bottom and top color
-    (1.0 - a) * sky_bottom_color + a * sky_top_color
+    if !hit_record
+        .mat
+        .scatter(r, &hit_record, &mut attenuation, &mut scattered, rng)
+    {
+        return color_from_emission;
+    }
+    color_from_emission + (attenuation * ray_color(&scattered, depth - 1, world, rng))
 }
 
 fn write_color(

@@ -53,4 +53,8 @@ impl Material for Lambertian {
             albedo: self.albedo.clone(),
         })
     }
+
+    fn emitted(&self, u: f64, v: f64, p: Vec3) -> Vec3 {
+        Vec3::new_default()
+    }
 }
