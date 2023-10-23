@@ -26,6 +26,7 @@ use sdl2::rect::Rect;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
 use std::sync::{Arc, Mutex};
+use std::thread::current;
 use std::time::Instant;
 use texture::image_texture::ImageTexture;
 use texture::solid_color::SolidColor;
@@ -46,6 +47,7 @@ mod pixel_buffer;
 mod ray;
 mod utils;
 mod vector;
+mod world_constructor;
 
 mod texture {
     pub mod base;
@@ -60,6 +62,11 @@ mod hittable {
     pub mod hittable_list;
     pub mod quad;
     pub mod sphere;
+
+    pub mod transformations {
+        pub mod translation;
+        pub mod rotation_y;
+    }
 }
 
 mod material {
@@ -76,7 +83,7 @@ fn main() {
     let sdl_context: sdl2::Sdl = sdl2::init().unwrap();
     let video_subsystem: sdl2::VideoSubsystem = sdl_context.video().unwrap();
     let window: Window = video_subsystem
-        .window("Rustracer", SCREEN_WIDTH, SCREEN_HEIGHT)
+        .window("Grinding Metal", SCREEN_WIDTH, SCREEN_HEIGHT)
         .position_centered()
         .build()
         .unwrap();
@@ -118,8 +125,8 @@ fn main() {
     let mut camera_center: Vec3 = Vec3::new_default();
     let mut pixel00_loc: Vec3 = Vec3::new_default();
 
-    let lookfrom = Vec3::new(1.0, 0.0, 0.0);
-    let lookat = Vec3::new(0.0, 0.0, -1.0);
+    let lookfrom = Vec3::new(0.0, 5.0, 0.0);
+    let lookat = Vec3::new(0.0, 0.0, 1.0);
 
     initialize_camera(
         &mut camera_center,
@@ -133,7 +140,13 @@ fn main() {
 
     // Thread stuff.
 
-    let mut world: HittableList = HittableList::new();
+    let mut rng = XorShiftRng::from_seed([
+        0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+        0x88,
+    ]);
+
+    let mut world = world_constructor::init_world(current_path, &mut rng);
+    /*let mut world: HittableList = HittableList::new();
     world.add(Box::new(Sphere::new(
         &Vec3::new(0.0, 0.0, -1.0),
         0.5,
@@ -153,14 +166,9 @@ fn main() {
         Box::new(DiffuseLight::new(Arc::new(SolidColor::new_vector(
             Vec3::new(4.0, 4.0, 4.0),
         )))),
-    )));
+    )));*/
 
-    let mut rng = XorShiftRng::from_seed([
-        0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-        0x88,
-    ]);
-
-    world = HittableList::new_add(Box::new(BvhNode::new_list(&world, &mut rng)));
+    // world = HittableList::new_add(Box::new(BvhNode::new_list(&world, &mut rng)));
 
     let shared_vec = Arc::new(buffers);
     let shared_world = Arc::new(world);
@@ -321,11 +329,11 @@ fn ray_color(r: &Ray, depth: i32, world: &HittableList, rng: &mut XorShiftRng) -
         &Interval::new(0.001, std::f64::INFINITY),
         &mut hit_record,
     ) {
-        // let sky_bottom_color: Vec3 = Vec3::new(1.0, 1.0, 1.0);
-        // let sky_top_color: Vec3 = Vec3::new(0.5, 0.7, 1.0);
+        let sky_bottom_color: Vec3 = Vec3::new(1.0, 1.0, 1.0);
+        let sky_top_color: Vec3 = Vec3::new(0.5, 0.7, 1.0);
 
-        let sky_bottom_color: Vec3 = Vec3::new(0.0, 0.1, 0.2);
-        let sky_top_color: Vec3 = Vec3::new(0.0, 0.0, 0.0);
+        // let sky_bottom_color: Vec3 = Vec3::new(0.0, 0.1, 0.2);
+        // let sky_top_color: Vec3 = Vec3::new(0.0, 0.0, 0.0);
 
         let unit_direction: Vec3 = r.direction.unit_vector();
         let a = 0.5 * (unit_direction.y() + 1.0);
