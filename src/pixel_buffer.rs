@@ -8,7 +8,7 @@ pub fn new() -> Box<[u8]> {
     vec![0; size].into_boxed_slice()
 }
 
-pub fn set(p: &mut Box<[u8]>, x: usize, y: usize, r: u8, g: u8, b: u8) {
+pub fn set(p: &mut [u8], x: usize, y: usize, r: u8, g: u8, b: u8) {
     let offset = (y * WIDTH + x) * 4;
     p[offset] = r;
     p[offset + 1] = g;

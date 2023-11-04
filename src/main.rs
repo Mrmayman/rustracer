@@ -107,7 +107,7 @@ fn main() {
     let mut event_pump: sdl2::EventPump = sdl_context.event_pump().unwrap();
     let mut quit: bool = false;
 
-    let delta_start_time: Instant = Instant::now();
+    let mut delta_start_time: Instant = Instant::now();
 
     let mut mouse_locked = false;
     let mut mouse_x = 0;
@@ -214,7 +214,7 @@ fn main() {
             90.0,
         );
 
-        // let delta_time = calculate_delta_time(&mut delta_start_time);
+        let delta_time = calculate_delta_time(&mut delta_start_time);
     }
 }
 
