@@ -1,16 +1,8 @@
-@group(0) @binding(0) var output_image: texture_storage_2d<rgba8unorm, write>;
+const pi: f32 = 3.1415926535897932385;
 
-struct Data {
-    width: f32,
-    height: f32,
-    scale_factor: f32,
-    time_elapsed: f32,
-};
-
-@group(0) @binding(1) var<uniform> data: Data;
-
-@group(0) @binding(2) var<uniform> objects_len: u32;
-@group(0) @binding(3) var<storage, read> objects: array<Object>;
+fn degrees_to_radians(degrees: f32) -> f32 {
+    return degrees * pi / 180.0;
+}
 
 struct Object {
     object_id: u32,
@@ -22,6 +14,8 @@ struct Object {
     _6: f32,
     _7: f32,
 }
+
+const id_sphere: u32 = 0;
 
 struct Ray {
     origin: vec3<f32>,
@@ -140,11 +134,31 @@ fn sphere_hit(center: vec3<f32>, radius: f32, ray: Ray, ray_tmin: f32, ray_tmax:
     return ret;
 }
 
+fn world_hit(ray: Ray, ray_tmin: f32, ray_tmax: f32, hit_record: ptr<function, HitRecord>) -> bool {
+    var hit_anything = false;
+    var temp_rec = HitRecord(vec3<f32>(0.0), 0.0, vec3<f32>(0.0), false);
+    var closest_so_far = ray_tmax;
+
+    for (var i = 0u; i < objects_len; i += 1u) {
+        if objects[i].object_id == id_sphere {
+            let circle_pos = vec3<f32>(objects[i]._1, objects[i]._2, objects[i]._3);
+            let circle_radius = objects[i]._4;
+            if sphere_hit(circle_pos, circle_radius, ray, ray_tmin, closest_so_far, &temp_rec) {
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                (*hit_record) = temp_rec;
+            }
+        }
+    }
+
+    return hit_anything;
+}
+
 fn ray_color(ray: Ray) -> vec4<f32> {
     var color = vec4<f32>(0.0);
 
     var hit_record = HitRecord(vec3<f32>(0.0), 0.0, vec3<f32>(0.0), false);
-    if sphere_hit(vec3<f32>(0.0, 0.0, -1.0), 0.5, ray, 0.0, pow(2.0, 127.0), &hit_record) {
+    if world_hit(ray, 0.0, pow(2.0, 127.0), &hit_record) {
         color = vec4<f32>(0.5 * (hit_record.normal + vec3<f32>(1.0)), 1.0);
     } else {
         let unit_direction = unit_vector(ray.direction);

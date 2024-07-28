@@ -34,17 +34,30 @@ impl<'a> Application<'a> {
 
         let mut objects_list = ObjectList::from_vec(
             &device,
-            vec![Object {
-                geometry: Geometry::Sphere {
-                    centre_x: 0.0,
-                    centre_y: 0.0,
-                    centre_z: -1.0,
-                    radius: 0.5,
-                    _1: 0.0,
-                    _2: 0.0,
-                    _3: 0.0,
+            vec![
+                Object {
+                    geometry: Geometry::Sphere {
+                        centre_x: 0.0,
+                        centre_y: 0.0,
+                        centre_z: -1.0,
+                        radius: 0.5,
+                        _1: 0.0,
+                        _2: 0.0,
+                        _3: 0.0,
+                    },
                 },
-            }],
+                Object {
+                    geometry: Geometry::Sphere {
+                        centre_x: 0.0,
+                        centre_y: -100.5,
+                        centre_z: -1.0,
+                        radius: 100.0,
+                        _1: 0.0,
+                        _2: 0.0,
+                        _3: 0.0,
+                    },
+                },
+            ],
         );
 
         let surface_capabilities = surface.get_capabilities(&adapter);
@@ -61,9 +74,12 @@ impl<'a> Application<'a> {
         };
         surface.configure(&device, &config);
 
+        let mut compute_shader_txt = include_str!("../shaders/raytracer/uniforms.wgsl").to_owned();
+        compute_shader_txt.push_str(include_str!("../shaders/compute_shader.wgsl"));
+
         let compute_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Compute Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/compute_shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(compute_shader_txt.into()),
         });
 
         let vertex_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
