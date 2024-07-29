@@ -1,4 +1,11 @@
+// import(uniforms.wgsl)
+// import(rng.wgsl)
+// import(interval.wgsl)
+
 const pi: f32 = 3.1415926535897932385;
+const infinity: f32 = pow(2.0, 127.0);
+
+const samples = 20;
 
 fn degrees_to_radians(degrees: f32) -> f32 {
     return degrees * pi / 180.0;
@@ -38,22 +45,7 @@ fn hit_record_set_face_normal(rec: ptr<function, HitRecord>, ray: Ray, outward_n
     }
 }
 
-fn hash(seed: u32) -> u32 {
-    var result = seed;
-    result = (result ^ 61u) ^ (result >> 16u);
-    result = result + (result << 3u);
-    result = result ^ (result >> 4u);
-    result = result * 0x27d4eb2du;
-    result = result ^ (result >> 15u);
-    return result;
-}
-
-fn random(seed: u32) -> f32 {
-    let hashed = hash(seed);
-    return f32(hashed & 0x00FFFFFFu) / f32(0x01000000u);
-}
-
-fn writePixel(color: vec4<f32>, global_id: vec3<u32>) {
+fn write_pixel(color: vec4<f32>, global_id: vec3<u32>) {
     let uv = vec2<f32>(global_id.xy) / (vec2<f32>(data.width, data.height) / data.scale_factor);
     textureStore(output_image, vec2<i32>(global_id.xy), color);
 }
@@ -77,15 +69,34 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let viewport_upper_left = camera_center - vec3<f32>(0.0, 0.0, focal_length) - viewport_u / 2 - viewport_v / 2;
     let pixel_00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
 
+    var rng: u32 = rng_init(global_id.xy, vec2<u32>(u32(data.width), u32(data.height)), u32(data.time_elapsed * 100));
+
+    var color = vec3<f32>(0.0);
     // inside the loop...
+    for (var sample_i = 0; sample_i < samples; sample_i += 1) {
+        let ray = get_ray(global_id, &rng, pixel_00_loc, pixel_delta_u, pixel_delta_v, camera_center);
+        color += ray_color(ray);
+    }
+
+    write_pixel(vec4<f32>(color / f32(samples), 1.0), global_id);
+}
+
+fn get_ray(
+    global_id: vec3<u32>,
+    rng: ptr<function, u32>,
+    pixel_00_loc: vec3<f32>,
+    pixel_delta_u: vec3<f32>,
+    pixel_delta_v: vec3<f32>,
+    camera_center: vec3<f32>,
+) -> Ray {
+    // let offset = vec3<f32>(rng_float(rng) - 0.5, rng_float(rng) - 0.5, 0);
+
     let pixel_screen_pos = vec2<f32>(global_id.xy) * data.scale_factor;
+    // let pixel_center = pixel_00_loc + ((pixel_screen_pos.x + offset.x) * pixel_delta_u) + ((pixel_screen_pos.y + offset.y) * pixel_delta_v);
     let pixel_center = pixel_00_loc + (pixel_screen_pos.x * pixel_delta_u) + (pixel_screen_pos.y * pixel_delta_v);
     let ray_direction = pixel_center - camera_center;
 
-    let ray = Ray(camera_center, ray_direction);
-    let color = ray_color(ray);
-
-    writePixel(color, global_id);
+    return Ray(camera_center, ray_direction);
 }
 
 fn vec_length_squared(vector: vec3<f32>) -> f32 {
@@ -104,7 +115,7 @@ fn ray_at(ray: Ray, val: f32) -> vec3<f32> {
     return ray.origin + (val * ray.direction);
 }
 
-fn sphere_hit(center: vec3<f32>, radius: f32, ray: Ray, ray_tmin: f32, ray_tmax: f32, hit_record: ptr<function, HitRecord>) -> bool {
+fn sphere_hit(center: vec3<f32>, radius: f32, ray: Ray, ray_t: Interval, hit_record: ptr<function, HitRecord>) -> bool {
     let oc = center - ray.origin;
     let a = vec_length_squared(ray.direction);
     let h = dot(ray.direction, oc);
@@ -117,9 +128,9 @@ fn sphere_hit(center: vec3<f32>, radius: f32, ray: Ray, ray_tmin: f32, ray_tmax:
     } else {
         let sqrtd = sqrt(discriminant);
         var root = (h - sqrtd) / a;
-        if root <= ray_tmin || ray_tmax <= root {
+        if root <= ray_t.min || ray_t.max <= root {
             root = (h + sqrtd) / a;
-            if root <= ray_tmin || ray_tmax <= root {
+            if root <= ray_t.min || ray_t.max <= root {
                 ret = false;
             }
         }
@@ -134,16 +145,17 @@ fn sphere_hit(center: vec3<f32>, radius: f32, ray: Ray, ray_tmin: f32, ray_tmax:
     return ret;
 }
 
-fn world_hit(ray: Ray, ray_tmin: f32, ray_tmax: f32, hit_record: ptr<function, HitRecord>) -> bool {
+fn world_hit(ray: Ray, ray_t: Interval, hit_record: ptr<function, HitRecord>) -> bool {
     var hit_anything = false;
     var temp_rec = HitRecord(vec3<f32>(0.0), 0.0, vec3<f32>(0.0), false);
-    var closest_so_far = ray_tmax;
+    var closest_so_far = ray_t.max;
 
     for (var i = 0u; i < objects_len; i += 1u) {
-        if objects[i].object_id == id_sphere {
-            let circle_pos = vec3<f32>(objects[i]._1, objects[i]._2, objects[i]._3);
-            let circle_radius = objects[i]._4;
-            if sphere_hit(circle_pos, circle_radius, ray, ray_tmin, closest_so_far, &temp_rec) {
+        let object = objects[i];
+        if object.object_id == id_sphere {
+            let circle_pos = vec3<f32>(object._1, object._2, object._3);
+            let circle_radius = object._4;
+            if sphere_hit(circle_pos, circle_radius, ray, Interval(ray_t.min, closest_so_far), &temp_rec) {
                 hit_anything = true;
                 closest_so_far = temp_rec.t;
                 (*hit_record) = temp_rec;
@@ -154,17 +166,14 @@ fn world_hit(ray: Ray, ray_tmin: f32, ray_tmax: f32, hit_record: ptr<function, H
     return hit_anything;
 }
 
-fn ray_color(ray: Ray) -> vec4<f32> {
-    var color = vec4<f32>(0.0);
-
+fn ray_color(ray: Ray) -> vec3<f32> {
     var hit_record = HitRecord(vec3<f32>(0.0), 0.0, vec3<f32>(0.0), false);
-    if world_hit(ray, 0.0, pow(2.0, 127.0), &hit_record) {
-        color = vec4<f32>(0.5 * (hit_record.normal + vec3<f32>(1.0)), 1.0);
+    if world_hit(ray, Interval(0.0, infinity), &hit_record) {
+        return 0.5 * (hit_record.normal + vec3<f32>(1.0));
     } else {
         let unit_direction = unit_vector(ray.direction);
-        let a = 0.5 * (unit_direction.y + 1.0);
-        color = (1.0 - a) * vec4<f32>(1.0, 1.0, 1.0, 1.0) + a * vec4<f32>(0.5, 0.7, 1.0, 1.0);
+        let t = 0.5 * (unit_direction.y + 1.0);
+        return mix(vec3<f32>(1.0, 1.0, 1.0), vec3<f32>(0.5, 0.7, 1.0), t);
     }
-
-    return color;
 }
+

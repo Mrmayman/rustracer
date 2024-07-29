@@ -4,7 +4,7 @@ use std::{
 };
 
 use application::Application;
-use objects::Object;
+
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -31,7 +31,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<winit::window::Window>) {
 
                         let time_elapsed = app.last_frame_time.elapsed().as_secs_f64();
                         let remaining_time = (1.0 / 60.0) - time_elapsed;
-                        println!("sleeping {remaining_time}");
+                        println!("FPS: {}", 1.0 / time_elapsed);
                         if remaining_time > 0.0 {
                             std::thread::sleep(Duration::from_secs_f64(remaining_time));
                         }
