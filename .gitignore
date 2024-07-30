@@ -14,3 +14,5 @@ Cargo.lock
 *.pdb
 
 perf.data
+perf.data.old
+flamegraph.svg

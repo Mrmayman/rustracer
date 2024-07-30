@@ -5,4 +5,5 @@ pub struct DataBuffer {
     pub height: f32,
     pub scale_factor: f32,
     pub time_elapsed: f32,
+    pub frame_number: u32,
 }

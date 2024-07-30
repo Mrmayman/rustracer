@@ -9,7 +9,10 @@ use super::{data_buffer::DataBuffer, Application};
 impl<'a> Application<'a> {
     pub async fn new(window: Arc<winit::window::Window>) -> Self {
         let size = window.inner_size();
-        let instance = wgpu::Instance::default();
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..Default::default()
+        });
         let surface = instance.create_surface(window).unwrap();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -67,7 +70,7 @@ impl<'a> Application<'a> {
             format: surface_format,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![surface_format],
             desired_maximum_frame_latency: 2,
@@ -259,7 +262,7 @@ impl<'a> Application<'a> {
             ..Default::default()
         });
 
-        let scale_factor: f32 = 2.0; // Example scale factor
+        let scale_factor: f32 = 4.0; // Example scale factor
         let start_time = Instant::now();
 
         let data_buffer = DataBuffer {
@@ -267,6 +270,7 @@ impl<'a> Application<'a> {
             height: config.height as f32,
             scale_factor,
             time_elapsed: start_time.elapsed().as_secs_f32(),
+            frame_number: 0,
         };
 
         let data_buffer_object = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

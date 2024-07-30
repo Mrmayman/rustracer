@@ -4,6 +4,7 @@ use super::Application;
 
 impl<'a> Application<'a> {
     pub fn resize_window(&mut self, new_size: PhysicalSize<u32>) {
+        puffin::profile_function!();
         self.surface_config.width = new_size.width;
         self.surface_config.height = new_size.height;
         self.surface.configure(&self.device, &self.surface_config);
@@ -12,6 +13,7 @@ impl<'a> Application<'a> {
     }
 
     pub fn rescale_window(&mut self) {
+        puffin::profile_function!();
         let scaled_width = (self.surface_config.width as f32 / self.scale_factor) as u32;
         let scaled_height = (self.surface_config.height as f32 / self.scale_factor) as u32;
 
@@ -88,6 +90,7 @@ impl<'a> Application<'a> {
     }
 
     pub fn update_data(&mut self) {
+        puffin::profile_function!();
         self.queue.write_buffer(
             &self.data_buffer_object,
             0,

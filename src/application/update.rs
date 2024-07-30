@@ -2,6 +2,7 @@ use super::Application;
 
 impl<'a> Application<'a> {
     pub fn tick(&mut self) {
+        puffin::profile_function!();
         // TODO: Game ticking logic here.
         self.render();
     }
@@ -12,19 +13,29 @@ impl<'a> Application<'a> {
     }
 
     fn copy_texture_to_screen(&mut self) {
-        let frame = self
-            .surface
-            .get_current_texture()
-            .expect("Failed to acquire next swap chain texture");
+        puffin::profile_function!();
 
-        // Create a command encoder for the graphics pass
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
+        let (frame, mut encoder) = {
+            puffin::profile_scope!("create frame, encoder");
+
+            let frame = {
+                puffin::profile_scope!("create frame");
+                self.surface
+                    .get_current_texture()
+                    .expect("Failed to acquire next swap chain texture")
+            };
+
+            // Create a command encoder for the graphics pass
+            let encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
+            (frame, encoder)
+        };
 
         {
+            puffin::profile_scope!("render pass");
             let view = frame
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());
@@ -58,6 +69,7 @@ impl<'a> Application<'a> {
     }
 
     fn run_compute_shader(&mut self) {
+        puffin::profile_function!();
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -72,10 +84,15 @@ impl<'a> Application<'a> {
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
             compute_pass.dispatch_workgroups(
-                self.surface_config.width,
-                self.surface_config.height,
+                (self.surface_config.width as f32 / self.scale_factor) as u32,
+                (self.surface_config.height as f32 / self.scale_factor) as u32,
                 1,
-            )
+            );
+            println!(
+                "{}, {}",
+                self.surface_config.width as f32 / self.scale_factor,
+                self.surface_config.height as f32 / self.scale_factor
+            );
         }
 
         // Submit the command buffer

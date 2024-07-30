@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Instant};
 
 use application::Application;
 
@@ -27,18 +24,21 @@ async fn run(event_loop: EventLoop<()>, window: Arc<winit::window::Window>) {
                         app.resize_window(new_size);
                     }
                     WindowEvent::RedrawRequested => {
+                        puffin::GlobalProfiler::lock().new_frame();
+                        puffin::profile_scope!("redraw");
                         app.tick();
 
                         let time_elapsed = app.last_frame_time.elapsed().as_secs_f64();
                         let remaining_time = (1.0 / 60.0) - time_elapsed;
                         println!("FPS: {}", 1.0 / time_elapsed);
                         if remaining_time > 0.0 {
-                            std::thread::sleep(Duration::from_secs_f64(remaining_time));
+                            // std::thread::sleep(Duration::from_secs_f64(remaining_time));
                         }
 
                         app.last_frame_time = Instant::now();
 
                         app.data_buffer.time_elapsed = app.start_time.elapsed().as_secs_f32();
+                        app.data_buffer.frame_number += 1;
                         app.update_data();
                         window.request_redraw();
                     }
@@ -51,6 +51,12 @@ async fn run(event_loop: EventLoop<()>, window: Arc<winit::window::Window>) {
 }
 
 fn main() {
+    let server_addr = format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT);
+    let _puffin_server = puffin_http::Server::new(&server_addr).unwrap();
+    eprintln!("Serving demo profile data on {server_addr}. Run `puffin_viewer` to view it.");
+
+    puffin::set_scopes_on(true);
+
     let event_loop = EventLoop::new().unwrap();
     let window = WindowBuilder::new()
         .with_title("Some GPU application")

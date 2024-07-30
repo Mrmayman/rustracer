@@ -2,10 +2,10 @@
 // import(rng.wgsl)
 // import(interval.wgsl)
 
-const pi: f32 = 3.1415926535897932385;
 const infinity: f32 = pow(2.0, 127.0);
 
-const samples = 20;
+const samples = 16;
+const bounces = 8;
 
 fn degrees_to_radians(degrees: f32) -> f32 {
     return degrees * pi / 180.0;
@@ -52,6 +52,7 @@ fn write_pixel(color: vec4<f32>, global_id: vec3<u32>) {
 
 @compute @workgroup_size(1, 1, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    // write_pixel(vec4<f32>(0.0, 0.0, f32(data.frame_number) / 50.0, 1.0), global_id);
     let aspect_ratio = data.width / data.height;
 
     let viewport_height = 2.0;
@@ -69,13 +70,13 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let viewport_upper_left = camera_center - vec3<f32>(0.0, 0.0, focal_length) - viewport_u / 2 - viewport_v / 2;
     let pixel_00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
 
-    var rng: u32 = rng_init(global_id.xy, vec2<u32>(u32(data.width), u32(data.height)), u32(data.time_elapsed * 100));
+    var rng: u32 = rng_init(global_id.xy, vec2<u32>(u32(data.width), u32(data.height)), data.frame_number);
 
     var color = vec3<f32>(0.0);
     // inside the loop...
     for (var sample_i = 0; sample_i < samples; sample_i += 1) {
         let ray = get_ray(global_id, &rng, pixel_00_loc, pixel_delta_u, pixel_delta_v, camera_center);
-        color += ray_color(ray);
+        color += ray_color(ray, &rng);
     }
 
     write_pixel(vec4<f32>(color / f32(samples), 1.0), global_id);
@@ -89,11 +90,11 @@ fn get_ray(
     pixel_delta_v: vec3<f32>,
     camera_center: vec3<f32>,
 ) -> Ray {
-    // let offset = vec3<f32>(rng_float(rng) - 0.5, rng_float(rng) - 0.5, 0);
+    let offset = vec3<f32>(rng_float(rng) - 0.5, rng_float(rng) - 0.5, 0);
 
     let pixel_screen_pos = vec2<f32>(global_id.xy) * data.scale_factor;
-    // let pixel_center = pixel_00_loc + ((pixel_screen_pos.x + offset.x) * pixel_delta_u) + ((pixel_screen_pos.y + offset.y) * pixel_delta_v);
-    let pixel_center = pixel_00_loc + (pixel_screen_pos.x * pixel_delta_u) + (pixel_screen_pos.y * pixel_delta_v);
+    let pixel_center = pixel_00_loc + ((pixel_screen_pos.x + offset.x) * pixel_delta_u) + ((pixel_screen_pos.y + offset.y) * pixel_delta_v);
+    // let pixel_center = pixel_00_loc + (pixel_screen_pos.x * pixel_delta_u) + (pixel_screen_pos.y * pixel_delta_v);
     let ray_direction = pixel_center - camera_center;
 
     return Ray(camera_center, ray_direction);
@@ -166,14 +167,26 @@ fn world_hit(ray: Ray, ray_t: Interval, hit_record: ptr<function, HitRecord>) ->
     return hit_anything;
 }
 
-fn ray_color(ray: Ray) -> vec3<f32> {
-    var hit_record = HitRecord(vec3<f32>(0.0), 0.0, vec3<f32>(0.0), false);
-    if world_hit(ray, Interval(0.0, infinity), &hit_record) {
-        return 0.5 * (hit_record.normal + vec3<f32>(1.0));
-    } else {
-        let unit_direction = unit_vector(ray.direction);
-        let t = 0.5 * (unit_direction.y + 1.0);
-        return mix(vec3<f32>(1.0, 1.0, 1.0), vec3<f32>(0.5, 0.7, 1.0), t);
+fn ray_color(primary_ray: Ray, state: ptr<function, u32>) -> vec3<f32> {
+    var color = vec3<f32>(0.0, 0.0, 0.0);
+    var ray = primary_ray;
+    var attenuation = 1.0;
+
+    for (var bounce = 0; bounce < bounces; bounce += 1) {
+        var hit_record = HitRecord(vec3<f32>(0.0), 0.0, vec3<f32>(0.0), false);
+        if world_hit(ray, Interval(0.001, infinity), &hit_record) {
+            let direction = hit_record.normal + rng_vec_unit_vector(state);
+            ray = Ray(hit_record.point, direction);
+            attenuation *= 0.5;
+        } else {
+            let unit_direction = unit_vector(ray.direction);
+            let t = 0.5 * (unit_direction.y + 1.0);
+            let sky_color = mix(vec3<f32>(1.0, 1.0, 1.0), vec3<f32>(0.5, 0.7, 1.0), t);
+            color = (sky_color * attenuation);
+            break;
+        }
     }
+
+    return color;
 }
 
