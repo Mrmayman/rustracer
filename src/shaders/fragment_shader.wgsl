@@ -13,7 +13,7 @@ struct WindowSize {
 fn main(@builtin(position) frag_coord: vec4<f32>) -> @location(0) vec4<f32> {
     let uv = frag_coord.xy / vec2<f32>(window_size.width, window_size.height);
     let color = textureSample(texture, texture_sampler, uv);
-    let gamma = 2.2;
+    let gamma = 1.0;
     return vec4<f32>(
         pow(color.x, gamma),
         pow(color.y, gamma),

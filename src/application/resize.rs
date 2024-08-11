@@ -58,6 +58,14 @@ impl<'a> Application<'a> {
                     binding: 3,
                     resource: self.objects_list.object_buffer.as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: self.materials_list.object_len.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: self.materials_list.object_buffer.as_entire_binding(),
+                },
             ],
         });
 

@@ -12,4 +12,7 @@ struct Data {
 @group(0) @binding(2) var<uniform> objects_len: u32;
 @group(0) @binding(3) var<storage, read> objects: array<Object>;
 
+@group(0) @binding(4) var<uniform> materials_len: u32;
+@group(0) @binding(5) var<storage, read> materials: array<Material>;
+
 const pi: f32 = 3.1415926535897932385;

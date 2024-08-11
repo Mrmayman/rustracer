@@ -12,7 +12,7 @@ mod update;
 
 pub use data_buffer::DataBuffer;
 
-use crate::objects::ObjectList;
+use crate::objects::{material::Material, Object, ObjectList};
 
 pub struct Application<'a> {
     pub surface: Surface<'a>,
@@ -34,5 +34,6 @@ pub struct Application<'a> {
     pub last_frame_time: Instant,
     pub start_time: Instant,
 
-    pub objects_list: ObjectList,
+    pub objects_list: ObjectList<Object>,
+    pub materials_list: ObjectList<Material>,
 }

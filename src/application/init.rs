@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Instant};
 
 use wgpu::{util::DeviceExt, PipelineCompilationOptions};
 
-use crate::objects::{Geometry, Object, ObjectList};
+use crate::objects::{material::Material, Geometry, Object, ObjectList};
 
 use super::{data_buffer::DataBuffer, Application};
 
@@ -40,14 +40,23 @@ impl<'a> Application<'a> {
             vec![
                 Object {
                     geometry: Geometry::Sphere {
-                        centre_x: 0.0,
+                        centre_x: -0.5,
                         centre_y: 0.0,
                         centre_z: -1.0,
                         radius: 0.5,
-                        _1: 0.0,
-                        _2: 0.0,
-                        _3: 0.0,
+                        _padding: Default::default(),
                     },
+                    material: 1,
+                },
+                Object {
+                    geometry: Geometry::Sphere {
+                        centre_x: 0.5,
+                        centre_y: 0.0,
+                        centre_z: -1.0,
+                        radius: 0.5,
+                        _padding: Default::default(),
+                    },
+                    material: 2,
                 },
                 Object {
                     geometry: Geometry::Sphere {
@@ -55,12 +64,32 @@ impl<'a> Application<'a> {
                         centre_y: -100.5,
                         centre_z: -1.0,
                         radius: 100.0,
-                        _1: 0.0,
-                        _2: 0.0,
-                        _3: 0.0,
+                        _padding: Default::default(),
                     },
+                    material: 0,
                 },
             ],
+            "Object".to_owned(),
+        );
+
+        let materials_list = ObjectList::from_vec(
+            &device,
+            vec![
+                Material::Lambertian {
+                    albedo: [1.0, 0.5, 0.25, 1.0],
+                    _padding: Default::default(),
+                },
+                Material::Metal {
+                    albedo: [0.25, 0.5, 1.0, 1.0],
+                    _padding: Default::default(),
+                    fuzziness: 0.5,
+                },
+                Material::Dielectric {
+                    refraction_index: 1.5,
+                    _padding: Default::default(),
+                },
+            ],
+            "Materials".to_owned(),
         );
 
         let surface_capabilities = surface.get_capabilities(&adapter);
@@ -139,6 +168,28 @@ impl<'a> Application<'a> {
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 3,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: wgpu::BufferSize::new(0 as wgpu::BufferAddress),
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: wgpu::BufferSize::new(
+                                std::mem::size_of::<u32>() as wgpu::BufferAddress
+                            ),
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 5,
                         visibility: wgpu::ShaderStages::COMPUTE,
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Storage { read_only: true },
@@ -299,6 +350,14 @@ impl<'a> Application<'a> {
                     binding: 3,
                     resource: objects_list.object_buffer.as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: materials_list.object_len.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: materials_list.object_buffer.as_entire_binding(),
+                },
             ],
         });
 
@@ -345,6 +404,7 @@ impl<'a> Application<'a> {
             start_time,
             data_buffer,
             objects_list,
+            materials_list,
         }
     }
 }

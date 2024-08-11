@@ -38,7 +38,7 @@ fn rng_vec_unit_sphere(state: ptr<function, u32>) -> vec3<f32> {
 }
 
 fn rng_vec_unit_vector(state: ptr<function, u32>) -> vec3<f32> {
-    return unit_vector(rng_vec_unit_sphere(state));
+    return vec_unit_vector(rng_vec_unit_sphere(state));
 }
 
 fn rng_vec_unit_hemisphere(state: ptr<function, u32>, normal: vec3<f32>) -> vec3<f32> {

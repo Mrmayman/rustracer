@@ -1,7 +1,10 @@
 use wgpu::{util::DeviceExt, Buffer};
 
+pub mod material;
+
 #[repr(C)]
 pub struct Object {
+    pub material: u32,
     pub geometry: Geometry,
 }
 
@@ -44,23 +47,22 @@ pub enum Geometry {
         centre_y: f32,
         centre_z: f32,
         radius: f32,
-        _1: f32,
-        _2: f32,
-        _3: f32,
+        _padding: [f32; 16 - 6],
     },
 }
 
-pub struct ObjectList {
-    pub objects: Vec<Object>,
+pub struct ObjectList<O> {
+    pub objects: Vec<O>,
     pub object_buffer: Buffer,
     pub object_len: Buffer,
+    pub name: String,
 }
 
-impl ObjectList {
-    pub fn new(device: &wgpu::Device) -> Self {
+impl<O> ObjectList<O> {
+    pub fn new(device: &wgpu::Device, name: String) -> Self {
         let objects = vec![];
         let object_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Objects Buffer"),
+            label: Some(&format!("{} Buffer", name)),
             contents: to_bytes_unsized(
                 objects.as_slice(),
                 objects.len() * std::mem::size_of::<Object>(),
@@ -69,7 +71,7 @@ impl ObjectList {
         });
 
         let object_len = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Objects Buffer"),
+            label: Some(&format!("{} Length", name)),
             contents: to_bytes(&(objects.len() as u32)),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
@@ -78,21 +80,22 @@ impl ObjectList {
             objects,
             object_buffer,
             object_len,
+            name,
         }
     }
 
-    pub fn from_vec(device: &wgpu::Device, objects: Vec<Object>) -> Self {
+    pub fn from_vec(device: &wgpu::Device, objects: Vec<O>, name: String) -> Self {
         let object_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Objects Buffer"),
+            label: Some(&format!("{} Buffer", name)),
             contents: to_bytes_unsized(
                 objects.as_slice(),
-                objects.len() * std::mem::size_of::<Object>(),
+                objects.len() * std::mem::size_of::<O>(),
             ),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
         let object_len = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Objects Buffer"),
+            label: Some(&format!("{} Length", name)),
             contents: to_bytes(&(objects.len() as u32)),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
@@ -101,10 +104,11 @@ impl ObjectList {
             objects,
             object_buffer,
             object_len,
+            name,
         }
     }
 
-    pub fn push(&mut self, queue: &wgpu::Queue, object: Object) {
+    pub fn push(&mut self, queue: &wgpu::Queue, object: O) {
         self.objects.push(object);
         self.update(queue);
     }
