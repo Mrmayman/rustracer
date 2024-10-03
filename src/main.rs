@@ -60,6 +60,10 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     let window = WindowBuilder::new()
         .with_title("Some GPU application")
+        .with_inner_size(winit::dpi::PhysicalSize {
+            width: 150,
+            height: 100,
+        })
         .build(&event_loop)
         .unwrap();
 

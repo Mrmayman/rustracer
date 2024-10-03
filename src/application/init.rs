@@ -109,6 +109,7 @@ impl<'a> Application<'a> {
         let mut compute_shader_txt = include_str!("../shaders/raytracer/uniforms.wgsl").to_owned();
         compute_shader_txt.push_str(include_str!("../shaders/raytracer/rng.wgsl"));
         compute_shader_txt.push_str(include_str!("../shaders/raytracer/interval.wgsl"));
+        compute_shader_txt.push_str(include_str!("../shaders/raytracer/vec.wgsl"));
         compute_shader_txt.push_str(include_str!("../shaders/compute_shader.wgsl"));
 
         let compute_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -313,7 +314,7 @@ impl<'a> Application<'a> {
             ..Default::default()
         });
 
-        let scale_factor: f32 = 4.0; // Example scale factor
+        let scale_factor: f32 = 1.0; // Example scale factor
         let start_time = Instant::now();
 
         let data_buffer = DataBuffer {
