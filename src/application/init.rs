@@ -1,8 +1,11 @@
-use std::{sync::Arc, time::Instant};
+use std::{collections::HashSet, sync::Arc, time::Instant};
 
 use wgpu::{util::DeviceExt, PipelineCompilationOptions};
 
-use crate::objects::{material::Material, Geometry, Object, ObjectList};
+use crate::{
+    objects::{material::Material, Geometry, Object, ObjectList},
+    SCALE_FACTOR,
+};
 
 use super::{data_buffer::DataBuffer, Application};
 
@@ -313,16 +316,20 @@ impl<'a> Application<'a> {
             mipmap_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
-
-        let scale_factor: f32 = 1.0; // Example scale factor
         let start_time = Instant::now();
 
         let data_buffer = DataBuffer {
             width: config.width as f32,
             height: config.height as f32,
-            scale_factor,
+            scale_factor: SCALE_FACTOR,
             time_elapsed: start_time.elapsed().as_secs_f32(),
             frame_number: 0,
+            camx: 0.0,
+            camy: 0.0,
+            camz: 0.0,
+            lookx: 0.0,
+            looky: 0.0,
+            lookz: 0.0,
         };
 
         let data_buffer_object = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -396,7 +403,7 @@ impl<'a> Application<'a> {
             compute_pipeline,
             queue,
             texture,
-            scale_factor,
+            scale_factor: SCALE_FACTOR,
             texture_view,
             compute_bind_group_layout,
             texture_bind_group_layout,
@@ -406,6 +413,10 @@ impl<'a> Application<'a> {
             data_buffer,
             objects_list,
             materials_list,
+            camera_pos: [0.0, 0.0, 0.0],
+            keys_pressed: HashSet::new(),
+            camera_dir: super::LookDirection::InDirection(0.0, 0.0),
+            is_mouse_locked: true,
         }
     }
 }

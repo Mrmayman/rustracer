@@ -1,5 +1,7 @@
 use super::Application;
 
+pub const WORKGROUP_SIZE: f32 = 8.0;
+
 impl<'a> Application<'a> {
     pub fn tick(&mut self) {
         puffin::profile_function!();
@@ -83,15 +85,13 @@ impl<'a> Application<'a> {
             });
             compute_pass.set_pipeline(&self.compute_pipeline);
             compute_pass.set_bind_group(0, &self.compute_bind_group, &[]);
+
             compute_pass.dispatch_workgroups(
-                (self.surface_config.width as f32 / self.scale_factor) as u32,
-                (self.surface_config.height as f32 / self.scale_factor) as u32,
+                (self.surface_config.width as f32 / (self.scale_factor * WORKGROUP_SIZE)).ceil()
+                    as u32,
+                (self.surface_config.height as f32 / (self.scale_factor * WORKGROUP_SIZE)).ceil()
+                    as u32,
                 1,
-            );
-            println!(
-                "{}, {}",
-                self.surface_config.width as f32 / self.scale_factor,
-                self.surface_config.height as f32 / self.scale_factor
             );
         }
 

@@ -94,15 +94,40 @@ impl<'a> Application<'a> {
 
         self.data_buffer.width = self.surface_config.width as f32;
         self.data_buffer.height = self.surface_config.height as f32;
-        self.update_data();
+        self.update_data_buffer();
     }
 
-    pub fn update_data(&mut self) {
+    pub fn update_data_buffer(&mut self) {
         puffin::profile_function!();
+
+        self.last_frame_time = std::time::Instant::now();
+
+        self.data_buffer.time_elapsed = self.start_time.elapsed().as_secs_f32();
+        self.data_buffer.frame_number += 1;
+
         self.queue.write_buffer(
             &self.data_buffer_object,
             0,
             bytemuck::cast_slice(&[self.data_buffer]),
         );
+    }
+
+    pub fn update_camera(&mut self) {
+        self.data_buffer.camx = self.camera_pos[0];
+        self.data_buffer.camy = self.camera_pos[1];
+        self.data_buffer.camz = self.camera_pos[2];
+
+        match self.camera_dir {
+            crate::application::LookDirection::AtPoint(x, y, z) => {
+                self.data_buffer.lookx = x;
+                self.data_buffer.looky = y;
+                self.data_buffer.lookz = z;
+            }
+            crate::application::LookDirection::InDirection(rotx, roty) => {
+                self.data_buffer.lookx = self.camera_pos[0] + roty.cos() * rotx.cos();
+                self.data_buffer.looky = self.camera_pos[1] + rotx.sin();
+                self.data_buffer.lookz = self.camera_pos[2] + roty.sin() * rotx.cos();
+            }
+        }
     }
 }

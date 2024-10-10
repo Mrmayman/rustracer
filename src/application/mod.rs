@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{collections::HashSet, time::Instant};
 
 use wgpu::{
     BindGroup, BindGroupLayout, Buffer, ComputePipeline, Device, Queue, RenderPipeline, Sampler,
@@ -11,8 +11,16 @@ mod resize;
 mod update;
 
 pub use data_buffer::DataBuffer;
+pub use update::WORKGROUP_SIZE;
+
+use winit::keyboard::KeyCode;
 
 use crate::objects::{material::Material, Object, ObjectList};
+
+pub enum LookDirection {
+    AtPoint(f32, f32, f32),
+    InDirection(f32, f32),
+}
 
 pub struct Application<'a> {
     pub surface: Surface<'a>,
@@ -28,12 +36,18 @@ pub struct Application<'a> {
     pub compute_pipeline: ComputePipeline,
     pub queue: Queue,
     pub texture: Texture,
-    pub scale_factor: f32,
     pub texture_view: TextureView,
     pub sampler: Sampler,
+
     pub last_frame_time: Instant,
     pub start_time: Instant,
 
     pub objects_list: ObjectList<Object>,
     pub materials_list: ObjectList<Material>,
+
+    pub camera_pos: [f32; 3],
+    pub camera_dir: LookDirection,
+    pub scale_factor: f32,
+    pub keys_pressed: HashSet<KeyCode>,
+    pub is_mouse_locked: bool,
 }

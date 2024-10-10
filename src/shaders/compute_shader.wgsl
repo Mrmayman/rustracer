@@ -1,11 +1,22 @@
+// The following imports are automatically added during shader loading stage
+
 // import(uniforms.wgsl)
 // import(rng.wgsl)
 // import(interval.wgsl)
+// import(vec.wgsl)
+
+// Tweak these settings as per your needs:
+// =======================================
+// Samples: Less is faster. Higher samples give less noise.
+const samples = 64;
+// Bounces: Less is faster. Higher bounces improve reflections.
+const bounces = 4;
+// Antialiasing: Fixes those jagged pixels in the edges of objects.
+const antialiasing = 1;
+// =======================================
 
 const infinity: f32 = pow(2.0, 127.0);
-
-const samples = 32;
-const bounces = 4;
+const bounce_cutoff = 0.1;
 
 fn degrees_to_radians(degrees: f32) -> f32 {
     return degrees * pi / 180.0;
@@ -48,25 +59,27 @@ const mat_id_metal: u32 = 1;
 const mat_id_dielectric: u32 = 2;
 
 fn material_scatter(material: Material, r_in: Ray, rec: ptr<function, HitRecord>, attenuation: ptr<function, vec3<f32>>, scattered: ptr<function, Ray>, rng_state: ptr<function, u32>) -> bool {
+    let hrec = (*rec);
+    let normal = hrec.normal;
+    let point = hrec.point;
     if material.material_id == mat_id_lambertian {
-        var scatter_direction = (*rec).normal + rng_vec_unit_vector(rng_state);
-
+        var scatter_direction = normal + rng_vec_unit_vector(rng_state);
         if vec_near_zero(scatter_direction) {
-            scatter_direction = (*rec).normal;
+            scatter_direction = normal;
         }
 
-        (*scattered) = Ray((*rec).point, scatter_direction);
+        (*scattered) = Ray(point, scatter_direction);
         (*attenuation) *= vec3<f32>(material._1, material._2, material._3);
         return true;
     } else if material.material_id == mat_id_metal {
-        var reflected = vec_reflected(r_in.direction, (*rec).normal);
+        var reflected = vec_reflected(r_in.direction, normal);
         reflected = vec_unit_vector(reflected) + (material._5 * rng_vec_unit_vector(rng_state));
-        (*scattered) = Ray((*rec).point, reflected);
+        (*scattered) = Ray(point, reflected);
         (*attenuation) *= vec3<f32>(material._1, material._2, material._3);
-        return (dot((*scattered).direction, (*rec).normal) > 0);
+        return (dot(reflected, normal) > 0);
     } else if material.material_id == mat_id_dielectric {
         var ri = 0.0;
-        if (*rec).front_face {
+        if hrec.front_face {
             ri = 1.0 / material._1;
         } else {
             ri = material._1;
@@ -74,19 +87,19 @@ fn material_scatter(material: Material, r_in: Ray, rec: ptr<function, HitRecord>
 
         let unit_direction = vec_unit_vector(r_in.direction);
 
-        let cos_theta = min(dot(-unit_direction, (*rec).normal), 1.0);
+        let cos_theta = min(dot(-unit_direction, normal), 1.0);
         let sin_theta = sqrt(1.0 - (cos_theta * cos_theta));
 
         let cannot_refract = ri * sin_theta > 1.0;
         var direction = vec3<f32>(0.0);
 
         if cannot_refract || dielectric_reflectance(cos_theta, ri) > rng_float(rng_state) {
-            direction = vec_reflected(unit_direction, (*rec).normal);
+            direction = vec_reflected(unit_direction, normal);
         } else {
-            direction = vec_refract(unit_direction, (*rec).normal, ri);
+            direction = vec_refract(unit_direction, normal, ri);
         }
 
-        (*scattered) = Ray((*rec).point, direction);
+        (*scattered) = Ray(point, direction);
         return true;
     } else {
         return false;
@@ -114,10 +127,12 @@ struct HitRecord {
     material: Material,
 }
 
-fn hit_record_set_face_normal(rec: ptr<function, HitRecord>, ray: Ray, outward_normal: vec3<f32>) {
+fn hit_record_set_face_normal(rec: HitRecord, ray: Ray, outward_normal: vec3<f32>) -> HitRecord {
     let dot_normal = dot(ray.direction, outward_normal);
-    (*rec).front_face = dot_normal < 0;
-    (*rec).normal = (abs(dot_normal) / -dot_normal) * outward_normal;
+    var hrec = rec;
+    hrec.front_face = dot_normal < 0;
+    hrec.normal = (abs(dot_normal) / -dot_normal) * outward_normal;
+    return hrec;
 }
 
 fn hit_record_new() -> HitRecord {
@@ -129,25 +144,35 @@ fn write_pixel(color: vec4<f32>, global_id: vec3<u32>) {
     textureStore(output_image, vec2<i32>(global_id.xy), color);
 }
 
-@compute @workgroup_size(1, 1, 1)
+@compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // write_pixel(vec4<f32>(0.0, 0.0, f32(data.frame_number) / 50.0, 1.0), global_id);
     let aspect_ratio = data.width / data.height;
 
-    let viewport_height = 2.0;
-    let viewport_width = viewport_height * aspect_ratio;
+    let camera_center = vec3<f32>(data.camx, data.camy, data.camz);
+    let lookat = vec3<f32>(data.lookx, data.looky, data.lookz);
+    let focal_length = vec_length(camera_center - lookat);
+    let theta = degrees_to_radians(90.0);
+    let h = tan(theta / 2.0);
+    let viewport_height = 2.0 * h * focal_length;
 
-    let focal_length = 1.0;
-    let camera_center = vec3<f32>(0.0, 0.0, 0.0);
+    let vup = vec3<f32>(0.0, 1.0, 0.0);
 
-    let viewport_u = vec3<f32>(viewport_width, 0.0, 0.0);
-    let viewport_v = vec3<f32>(0.0, -viewport_height, 0.0);
+    let w = vec_unit_vector(camera_center - lookat);
+    let u = vec_unit_vector(cross(vup, w));
+    let v = cross(w, u);
+
+    let viewport_u = viewport_height * aspect_ratio * u;
+    let viewport_v = viewport_height * -v;
 
     let pixel_delta_u = viewport_u / data.width;
     let pixel_delta_v = viewport_v / data.height;
 
-    let viewport_upper_left = camera_center - vec3<f32>(0.0, 0.0, focal_length) - viewport_u / 2 - viewport_v / 2;
-    let pixel_00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
+    // let viewport_upper_left = camera_center - vec3<f32>(0.0, 0.0, focal_length) - 0.5 * (viewport_u + viewport_v);
+    // let pixel_00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
+
+    // May god forgive me for this abomination...
+    let pixel_00_loc = camera_center - (focal_length * w) - 0.5 * ((viewport_u + viewport_v) - (pixel_delta_u + pixel_delta_v));
 
     var rng: u32 = rng_init(global_id.xy, vec2<u32>(u32(data.width), u32(data.height)), data.frame_number);
 
@@ -169,11 +194,16 @@ fn get_ray(
     pixel_delta_v: vec3<f32>,
     camera_center: vec3<f32>,
 ) -> Ray {
-    let offset = vec3<f32>(rng_float(rng) - 0.5, rng_float(rng) - 0.5, 0);
-
     let pixel_screen_pos = vec2<f32>(global_id.xy) * data.scale_factor;
-    let pixel_center = pixel_00_loc + ((pixel_screen_pos.x + offset.x) * pixel_delta_u) + ((pixel_screen_pos.y + offset.y) * pixel_delta_v);
-    // let pixel_center = pixel_00_loc + (pixel_screen_pos.x * pixel_delta_u) + (pixel_screen_pos.y * pixel_delta_v);
+
+    var pixel_center = vec3<f32>(0.0);
+    if antialiasing == 1 {
+        let offset = vec3<f32>(rng_float(rng) - 0.5, rng_float(rng) - 0.5, 0);
+        pixel_center = pixel_00_loc + ((pixel_screen_pos.x + offset.x) * pixel_delta_u) + ((pixel_screen_pos.y + offset.y) * pixel_delta_v);
+    } else {
+        pixel_center = pixel_00_loc + (pixel_screen_pos.x * pixel_delta_u) + (pixel_screen_pos.y * pixel_delta_v);
+    }
+
     let ray_direction = pixel_center - camera_center;
 
     return Ray(camera_center, ray_direction);
@@ -201,12 +231,13 @@ fn sphere_hit(material: u32, center: vec3<f32>, radius: f32, ray: Ray, ray_t: In
                 return false;
             }
         }
-        (*hit_record).t = root;
-        (*hit_record).point = ray_at(ray, root);
-        (*hit_record).material = materials[material];
+        var hrec = (*hit_record);
+        hrec.t = root;
+        hrec.point = ray_at(ray, root);
+        hrec.material = materials[material];
 
-        let outward_normal = ((*hit_record).point - center) / radius;
-        hit_record_set_face_normal(hit_record, ray, outward_normal);
+        let outward_normal = (hrec.point - center) / radius;
+        (*hit_record) = hit_record_set_face_normal(hrec, ray, outward_normal);
     }
     return true;
 }
@@ -244,6 +275,9 @@ fn ray_color(primary_ray: Ray, state: ptr<function, u32>) -> vec3<f32> {
             var scattered = Ray(vec3<f32>(0.0), vec3<f32>(0.0));
             material_scatter(hit_record.material, ray, &hit_record, &attenuation, &scattered, state);
             ray = scattered;
+            if attenuation.x < bounce_cutoff && attenuation.y < bounce_cutoff && attenuation.z < bounce_cutoff {
+                break;
+            }
         } else {
             let unit_direction = vec_unit_vector(ray.direction);
             let t = 0.5 * (unit_direction.y + 1.0);
