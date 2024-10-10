@@ -134,13 +134,20 @@ async fn run(event_loop: EventLoop<()>, window: Arc<winit::window::Window>) {
 
 fn update_mouse_lock(app: &Application<'_>, window: &Arc<winit::window::Window>) {
     if app.is_mouse_locked {
+        if let Err(err) = window.set_cursor_grab(winit::window::CursorGrabMode::Locked) {
+            eprintln!("warning (cursor grab): {err}");
+        }
         let window_size = window.inner_size();
-        window
-            .set_cursor_position(Position::Physical(PhysicalPosition::new(
-                window_size.width as i32 / 2,
-                window_size.height as i32 / 2,
-            )))
-            .unwrap();
+        if let Err(err) = window.set_cursor_position(Position::Physical(PhysicalPosition::new(
+            window_size.width as i32 / 2,
+            window_size.height as i32 / 2,
+        ))) {
+            eprintln!("warning (cursor move): {err}");
+        }
+    } else {
+        if let Err(err) = window.set_cursor_grab(winit::window::CursorGrabMode::None) {
+            eprintln!("warning (cursor grab): {err}");
+        }
     }
     window.set_cursor_visible(!app.is_mouse_locked);
 }
