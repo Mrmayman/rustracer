@@ -22,6 +22,12 @@ async fn run(event_loop: EventLoop<()>, window: Arc<winit::window::Window>) {
 
     println!("Started application");
 
+    let refresh_rate = window
+        .primary_monitor()
+        .map(|monitor| monitor.refresh_rate_millihertz().map(|n| n as f64 / 1000.0))
+        .flatten()
+        .unwrap_or(60.0);
+
     event_loop
         .run(move |event, target| {
             target.set_control_flow(ControlFlow::Poll);
@@ -34,26 +40,30 @@ async fn run(event_loop: EventLoop<()>, window: Arc<winit::window::Window>) {
                     WindowEvent::RedrawRequested => {
                         puffin::GlobalProfiler::lock().new_frame();
                         puffin::profile_scope!("redraw");
+
                         app.tick();
 
-                        let time_elapsed = app.last_frame_time.elapsed().as_secs_f64();
-                        let remaining_time = (1.0 / 60.0) - time_elapsed;
-                        println!(
-                            "{:.2} FPS, Resolution: {} x {} ({} x {} workgroups)",
-                            1.0 / time_elapsed,
-                            (app.surface_config.width as f32 / app.scale_factor).ceil(),
-                            (app.surface_config.height as f32 / app.scale_factor).ceil(),
-                            (app.surface_config.width as f32 / (app.scale_factor * WORKGROUP_SIZE))
-                                .ceil(),
-                            (app.surface_config.height as f32
-                                / (app.scale_factor * WORKGROUP_SIZE))
-                                .ceil()
-                        );
-                        if remaining_time > 0.0 {
-                            // std::thread::sleep(std::time::Duration::from_secs_f64(remaining_time));
+                        {
+                            let x = app.surface_config.width as f32 / app.scale_factor;
+                            let y = app.surface_config.height as f32 / app.scale_factor;
+                            println!(
+                                "{:.2} FPS, Resolution: {} x {} ({} x {} workgroups)",
+                                1.0 / app.time_elapsed,
+                                x.ceil(),
+                                y.ceil(),
+                                (x / WORKGROUP_SIZE).ceil(),
+                                (y * WORKGROUP_SIZE).ceil()
+                            );
                         }
 
-                        let movement_speed: f32 = time_elapsed as f32 * 2.0;
+                        let remaining_time = (1.0 / refresh_rate) - app.time_elapsed;
+                        if remaining_time > 0.0 {
+                            // println!("Sleep: {:.1}", remaining_time * 1000.0);
+                            // std::thread::sleep(std::time::Duration::from_secs_f64(remaining_time));
+                            // std::thread::sleep(std::time::Duration::from_secs_f64(0.1));
+                        }
+
+                        let movement_speed: f32 = app.time_elapsed as f32 * 2.0;
                         if let LookDirection::InDirection(_, roty) = &app.camera_dir {
                             if app.keys_pressed.contains(&winit::keyboard::KeyCode::KeyW) {
                                 app.camera_pos[0] += movement_speed * roty.cos();
@@ -87,6 +97,9 @@ async fn run(event_loop: EventLoop<()>, window: Arc<winit::window::Window>) {
                         app.update_camera();
                         app.update_data_buffer();
                         window.request_redraw();
+
+                        app.time_elapsed = app.last_frame_time.elapsed().as_secs_f64();
+                        app.last_frame_time = std::time::Instant::now();
                     }
                     WindowEvent::KeyboardInput { event, .. } => {
                         if let winit::keyboard::PhysicalKey::Code(code) = event.physical_key {

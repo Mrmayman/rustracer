@@ -102,7 +102,7 @@ impl<'a> Application<'a> {
             format: surface_format,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::AutoVsync,
+            present_mode: wgpu::PresentMode::AutoNoVsync,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![surface_format],
             desired_maximum_frame_latency: 2,
@@ -417,6 +417,7 @@ impl<'a> Application<'a> {
             keys_pressed: HashSet::new(),
             camera_dir: super::LookDirection::InDirection(0.0, 0.0),
             is_mouse_locked: true,
+            time_elapsed: 1.0,
         }
     }
 }

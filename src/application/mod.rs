@@ -41,6 +41,7 @@ pub struct Application<'a> {
 
     pub last_frame_time: Instant,
     pub start_time: Instant,
+    pub time_elapsed: f64,
 
     pub objects_list: ObjectList<Object>,
     pub materials_list: ObjectList<Material>,

@@ -10,6 +10,7 @@ impl<'a> Application<'a> {
     }
 
     fn render(&mut self) {
+        puffin::profile_function!();
         self.run_compute_shader();
         self.copy_texture_to_screen();
     }
@@ -79,6 +80,7 @@ impl<'a> Application<'a> {
             });
 
         {
+            puffin::profile_scope!("compute pass");
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Compute Pass"),
                 timestamp_writes: None,

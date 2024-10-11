@@ -100,8 +100,6 @@ impl<'a> Application<'a> {
     pub fn update_data_buffer(&mut self) {
         puffin::profile_function!();
 
-        self.last_frame_time = std::time::Instant::now();
-
         self.data_buffer.time_elapsed = self.start_time.elapsed().as_secs_f32();
         self.data_buffer.frame_number += 1;
 
@@ -113,6 +111,7 @@ impl<'a> Application<'a> {
     }
 
     pub fn update_camera(&mut self) {
+        puffin::profile_function!();
         self.data_buffer.camx = self.camera_pos[0];
         self.data_buffer.camy = self.camera_pos[1];
         self.data_buffer.camz = self.camera_pos[2];
