@@ -7,12 +7,24 @@
 
 // Tweak these settings as per your needs:
 // =======================================
-// Samples: Less is faster. Higher samples give less noise.
-const samples = 64;
-// Bounces: Less is faster. Higher bounces improve reflections.
+// Samples: Less is faster. Higher samples reduce noise.
+// Each pixel is averaged across multiple rays to smooth out lighting.
+// Recommended: 32 for faster rendering, 64+ for quality.
+const samples = 32;
+// Bounces: Controls the number of light bounces (depth) for reflection and refraction.
+// More bounces improve accuracy but slow down performance.
+// Recommended: 2-4 for basic reflections, higher for complex scenes.
 const bounces = 4;
-// Antialiasing: Fixes those jagged pixels in the edges of objects.
-const antialiasing = 1;
+// Antialiasing: Improves the quality of object edges by smoothing jagged pixels.
+// 1 for On, and 0 for Off.
+// Note: Motion blur On looks better with antialiasing Off.
+const antialiasing = 0;
+// Motion Blur: Adds motion blur based on camera or object movement, reducing noise.
+// Cuts noise in half when set to 1.0, so:
+//   samples=64, motion_blur=0.0 == samples=32, motion_blur=1.0
+// This improves performance, but motion blur can cause eye strain.
+// 1 for On, and 0 for Off.
+const motion_blur = 1.0;
 // =======================================
 
 const infinity: f32 = pow(2.0, 127.0);
@@ -140,9 +152,9 @@ fn hit_record_new() -> HitRecord {
 }
 
 fn write_pixel(color: vec4<f32>, global_id: vec3<u32>) {
-    let uv = vec2<f32>(global_id.xy) / (vec2<f32>(data.width, data.height) / data.scale_factor);
-    // let old_color = textureSample(output_image_const, output_image_sampler, uv);
-    textureStore(output_image, vec2<i32>(global_id.xy), color);
+    let scale = u32(data.scale_factor);
+    let old_color = textureLoad(texture, vec2<i32>(global_id.xy), 0);
+    textureStore(output_image, vec2<i32>(global_id.xy), (color + (old_color * motion_blur)) / (1.0 + motion_blur));
 }
 
 @compute @workgroup_size(8, 8, 1)

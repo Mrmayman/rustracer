@@ -35,10 +35,13 @@ pub struct Application<'a> {
     pub render_pipeline: RenderPipeline,
     pub compute_pipeline: ComputePipeline,
     pub queue: Queue,
-    pub sampler: Sampler,
 
     pub texture: Texture,
     pub texture_view: TextureView,
+    pub sampler: Sampler,
+    pub previous_texture: Texture,
+    pub previous_texture_view: TextureView,
+    pub previous_sampler: Sampler,
 
     pub last_frame_time: Instant,
     pub start_time: Instant,

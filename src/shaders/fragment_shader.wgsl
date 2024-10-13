@@ -16,11 +16,13 @@ struct Data {
 };
 
 @group(0) @binding(2) var<uniform> data: Data;
+@group(0) @binding(3) var previous_texture: texture_storage_2d<rgba8unorm, write>;
 
 @fragment
 fn main(@builtin(position) frag_coord: vec4<f32>) -> @location(0) vec4<f32> {
     let uv = frag_coord.xy / vec2<f32>(data.width, data.height);
     let color = textureSample(texture, texture_sampler, uv);
+    textureStore(previous_texture, vec2<i32>(frag_coord.xy / data.scale_factor), color);
     let gamma = 1.0;
     return vec4<f32>(
         pow(color.x, gamma),
@@ -28,5 +30,6 @@ fn main(@builtin(position) frag_coord: vec4<f32>) -> @location(0) vec4<f32> {
         pow(color.z, gamma),
         1.0
     );
+    // return vec4<f32>(uv, 0.0, 1.0);
 }
 

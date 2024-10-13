@@ -32,10 +32,29 @@ impl<'a> Application<'a> {
                 usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
                 view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
             });
+
+            self.previous_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("Previous Output Texture"),
+                size: wgpu::Extent3d {
+                    width: scaled_width,
+                    height: scaled_height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+            });
         }
 
         self.texture_view = self
             .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.previous_texture_view = self
+            .previous_texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         self.compute_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -66,6 +85,10 @@ impl<'a> Application<'a> {
                     binding: 5,
                     resource: self.materials_list.object_buffer.as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(&self.previous_texture_view),
+                },
             ],
         });
 
@@ -88,6 +111,10 @@ impl<'a> Application<'a> {
                         offset: 0,
                         size: None,
                     }),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&self.previous_texture_view),
                 },
             ],
         });

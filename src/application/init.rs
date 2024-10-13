@@ -202,6 +202,16 @@ impl<'a> Application<'a> {
                         },
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 6,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
                 ],
             });
 
@@ -250,6 +260,16 @@ impl<'a> Application<'a> {
                             min_binding_size: wgpu::BufferSize::new(
                                 std::mem::size_of::<DataBuffer>() as wgpu::BufferAddress,
                             ),
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::StorageTexture {
+                            access: wgpu::StorageTextureAccess::WriteOnly,
+                            format: wgpu::TextureFormat::Rgba8Unorm,
+                            view_dimension: wgpu::TextureViewDimension::D2,
                         },
                         count: None,
                     },
@@ -316,6 +336,36 @@ impl<'a> Application<'a> {
             mipmap_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
+
+        let previous_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Previous Output Texture"),
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+        });
+
+        let previous_texture_view =
+            previous_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let previous_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Previous Texture Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
         let start_time = Instant::now();
 
         let data_buffer = DataBuffer {
@@ -366,6 +416,10 @@ impl<'a> Application<'a> {
                     binding: 5,
                     resource: materials_list.object_buffer.as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(&previous_texture_view),
+                },
             ],
         });
 
@@ -388,6 +442,10 @@ impl<'a> Application<'a> {
                         offset: 0,
                         size: None,
                     }),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&previous_texture_view),
                 },
             ],
         });
@@ -418,6 +476,9 @@ impl<'a> Application<'a> {
             camera_dir: super::LookDirection::InDirection(0.0, 0.0),
             is_mouse_locked: true,
             time_elapsed: 1.0,
+            previous_texture_view,
+            previous_texture,
+            previous_sampler,
         }
     }
 }

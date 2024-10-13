@@ -21,4 +21,6 @@ struct Data {
 @group(0) @binding(4) var<uniform> materials_len: u32;
 @group(0) @binding(5) var<storage, read> materials: array<Material>;
 
+@group(0) @binding(6) var texture: texture_2d<f32>;
+
 const pi: f32 = 3.1415926535897932385;
