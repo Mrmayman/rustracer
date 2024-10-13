@@ -141,6 +141,7 @@ fn hit_record_new() -> HitRecord {
 
 fn write_pixel(color: vec4<f32>, global_id: vec3<u32>) {
     let uv = vec2<f32>(global_id.xy) / (vec2<f32>(data.width, data.height) / data.scale_factor);
+    // let old_color = textureSample(output_image_const, output_image_sampler, uv);
     textureStore(output_image, vec2<i32>(global_id.xy), color);
 }
 

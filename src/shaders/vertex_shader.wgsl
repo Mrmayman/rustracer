@@ -1,4 +1,5 @@
 // vertex_shader.wgsl
+
 @vertex
 fn main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<f32> {
     var positions = array<vec2<f32>, 6>(
