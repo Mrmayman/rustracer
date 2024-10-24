@@ -44,6 +44,30 @@ const SCALE_FACTOR: f32 = 4.0;
 
 This can provide a major impact to your performance.
 
+You can also switch between rendering modes:
+- FSR: Use AMD FSR 1.0 to upscale the image. Disabled because of subpar quality.
+- glslSmartDenoise (default): Denoise the noisy image.
+- Nothing: Nothing is done.
+
+To switch between them, go to `src/shaders/fragment_shader.wgsl` and look for a statement like this:
+```
+    if false {
+        // AMD FSR Upscaling
+        var con0: vec4<u32>;
+        // ... more code
+    } else if true {
+        // Denoiser
+        let sigma = 1.0;
+        // ... more code
+    } else {
+        // Nothing
+        color = textureSample(texture, texture_sampler, uv);
+    }
+```
+- Make the first condition true to enable FSR Upscaling mode.
+- Make the first condition false, and second condition true to enable Denoiser.
+- Make both conditions false to do nothing.
+
 # Build
 - Install Rust
 - Clone the repo `git clone https://github.com/Mrmayman/rustracer.git`
@@ -58,4 +82,8 @@ This can provide a major impact to your performance.
 # Credits
 [_Ray Tracing in One Weekend_](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
 
-[_Ray Tracing: The Next Week_ (I didn't implement these features yet)](https://raytracing.github.io/books/RayTracingTheNextWeek.html)
+[_Ray Tracing: The Next Week_](https://raytracing.github.io/books/RayTracingTheNextWeek.html)
+
+[glslSmartDenoise (for denoising the image)](https://github.com/BrutPitt/glslSmartDeNoise/tree/master)
+
+[AMD FSR 1.0 (for upscaling, disabled by default)](https://github.com/GPUOpen-Effects/FidelityFX-FSR)

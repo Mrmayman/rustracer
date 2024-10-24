@@ -10,11 +10,11 @@
 // Samples: Less is faster. Higher samples reduce noise.
 // Each pixel is averaged across multiple rays to smooth out lighting.
 // Recommended: 32 for faster rendering, 64+ for quality.
-const samples = 32;
+const samples = 16;
 // Bounces: Controls the number of light bounces (depth) for reflection and refraction.
 // More bounces improve accuracy but slow down performance.
 // Recommended: 2-4 for basic reflections, higher for complex scenes.
-const bounces = 4;
+const bounces = 6;
 // Antialiasing: Improves the quality of object edges by smoothing jagged pixels.
 // 1 for On, and 0 for Off.
 // Note: Motion blur On looks better with antialiasing Off.
@@ -125,6 +125,7 @@ fn dielectric_reflectance(cosine: f32, refraction_index: f32) -> f32 {
 }
 
 const obj_id_sphere: u32 = 0;
+const obj_id_triangle: u32 = 1;
 
 struct Ray {
     origin: vec3<f32>,
@@ -253,6 +254,49 @@ fn sphere_hit(material: u32, center: vec3<f32>, radius: f32, ray: Ray, ray_t: In
         (*hit_record) = hit_record_set_face_normal(hrec, ray, outward_normal);
     }
     return true;
+}
+
+fn triangle_hit(material: u32, vert0: vec3<f32>, vert1: vec3<f32>, vert2: vec3<f32>, ray: Ray, ray_t: Interval, hit_record: ptr<function, HitRecord>) -> bool {
+    let tu_vec = vert1 - vert0;  // Vector from vertex 0 to vertex 1 (triangle edge)
+    let tv_vec = vert2 - vert0;  // Vector from vertex 0 to vertex 2 (triangle edge)
+    let p_vec = cross(ray.direction, tv_vec); // Cross product of ray direction and tv_vec
+    let det = dot(tu_vec, p_vec); // Determinant to check if ray is parallel to triangle
+
+    if abs(det) < 0.0001 { // If determinant is too small, ray is parallel to triangle plane
+        return false;
+    }
+
+    let inv_det = 1.0 / det;
+    let t_vec = ray.origin - vert0;
+    let u = dot(t_vec, p_vec) * inv_det;
+
+    if u < 0.0 || u > 1.0 { // If u is outside of valid range, no hit
+        return false;
+    }
+
+    let q_vec = cross(t_vec, tu_vec); // Cross product of t_vec and tu_vec
+    let v = dot(ray.direction, q_vec) * inv_det;
+
+    if v < 0.0 || u + v > 1.0 { // If v is outside of valid range, or u+v > 1 (outside triangle)
+        return false;
+    }
+
+    let t = dot(tv_vec, q_vec) * inv_det;
+
+    if t < ray_t.min || t > ray_t.max { // Check if t is within the valid range
+        return false;
+    }
+
+    // Update hit record
+    let hrec = (*hit_record);
+    hrec.t = t;
+    hrec.point = ray_at(ray, t);
+    hrec.material = materials[material];
+    let outward_normal = normalize(cross(tu_vec, tv_vec)); // Normal of the triangle plane
+
+    (*hit_record) = hit_record_set_face_normal(hrec, ray, outward_normal);
+
+    return true; // Intersection found
 }
 
 fn world_hit(ray: Ray, ray_t: Interval, hit_record: ptr<function, HitRecord>) -> bool {

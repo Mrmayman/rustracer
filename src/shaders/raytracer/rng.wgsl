@@ -37,6 +37,17 @@ fn rng_vec_unit_sphere(state: ptr<function, u32>) -> vec3<f32> {
     return vec3(x, y, z);
 }
 
+fn rng_vec_unit_disk(state: ptr<function, u32>) -> vec3<f32> {
+    let r = pow(rng_float(state), 0.33333f);
+    let theta = pi * rng_float(state);
+    let phi = 2f * pi * rng_float(state);
+
+    let x = r * sin(theta) * cos(phi);
+    let y = r * sin(theta) * sin(phi);
+
+    return vec3(x, y, 0.0);
+}
+
 fn rng_vec_unit_vector(state: ptr<function, u32>) -> vec3<f32> {
     return vec_unit_vector(rng_vec_unit_sphere(state));
 }

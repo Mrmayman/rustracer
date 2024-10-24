@@ -38,42 +38,53 @@ impl<'a> Application<'a> {
             .await
             .unwrap();
 
-        let objects_list = ObjectList::from_vec(
-            &device,
-            vec![
-                Object {
-                    geometry: Geometry::Sphere {
-                        centre_x: -0.5,
-                        centre_y: 0.0,
-                        centre_z: -1.0,
-                        radius: 0.5,
-                        _padding: Default::default(),
-                    },
-                    material: 1,
+        let mut objects_list = vec![
+            // Object {
+            //     geometry: Geometry::Sphere {
+            //         centre_x: -0.5,
+            //         centre_y: 0.0,
+            //         centre_z: -1.0,
+            //         radius: 0.5,
+            //         _padding: Default::default(),
+            //     },
+            //     material: 1,
+            // },
+            // Object {
+            //     geometry: Geometry::Sphere {
+            //         centre_x: 0.5,
+            //         centre_y: 0.0,
+            //         centre_z: -1.0,
+            //         radius: 0.5,
+            //         _padding: Default::default(),
+            //     },
+            //     material: 2,
+            // },
+            Object {
+                geometry: Geometry::Sphere {
+                    centre_x: 0.0,
+                    centre_y: -100.5,
+                    centre_z: -1.0,
+                    radius: 100.0,
+                    _padding: Default::default(),
                 },
-                Object {
-                    geometry: Geometry::Sphere {
-                        centre_x: 0.5,
-                        centre_y: 0.0,
-                        centre_z: -1.0,
-                        radius: 0.5,
-                        _padding: Default::default(),
-                    },
-                    material: 2,
+                material: 4,
+            },
+        ];
+
+        for i in 0..100 {
+            objects_list.push(Object {
+                geometry: Geometry::Sphere {
+                    centre_x: (i % 10) as f32,
+                    centre_y: 0.0,
+                    centre_z: -1.0 - (i / 10) as f32,
+                    radius: 0.4,
+                    _padding: Default::default(),
                 },
-                Object {
-                    geometry: Geometry::Sphere {
-                        centre_x: 0.0,
-                        centre_y: -100.5,
-                        centre_z: -1.0,
-                        radius: 100.0,
-                        _padding: Default::default(),
-                    },
-                    material: 0,
-                },
-            ],
-            "Object".to_owned(),
-        );
+                material: if i % 2 == 0 { 1 } else { 3 },
+            });
+        }
+
+        let objects_list = ObjectList::from_vec(&device, objects_list, "Object".to_owned());
 
         let materials_list = ObjectList::from_vec(
             &device,
@@ -90,6 +101,16 @@ impl<'a> Application<'a> {
                 Material::Dielectric {
                     refraction_index: 1.5,
                     _padding: Default::default(),
+                },
+                Material::Metal {
+                    albedo: [1.0, 0.5, 0.25, 1.0],
+                    _padding: Default::default(),
+                    fuzziness: 0.2,
+                },
+                Material::Metal {
+                    albedo: [0.7, 0.7, 0.7, 1.0],
+                    _padding: Default::default(),
+                    fuzziness: 0.1,
                 },
             ],
             "Materials".to_owned(),
@@ -127,9 +148,12 @@ impl<'a> Application<'a> {
 
         let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Fragment Shader"),
-            source: wgpu::ShaderSource::Wgsl(
-                include_str!("../shaders/fragment_shader.wgsl").into(),
-            ),
+            source: wgpu::ShaderSource::Wgsl({
+                let mut frag = include_str!("../shaders/fsr/fsr.wgsl").to_owned();
+                frag.push_str(include_str!("../shaders/denoise/denoise.wgsl"));
+                frag.push_str(include_str!("../shaders/fragment_shader.wgsl"));
+                frag.into()
+            }),
         });
 
         let compute_bind_group_layout =
