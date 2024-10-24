@@ -82,6 +82,21 @@ impl<'a> Application<'a> {
                 },
                 material: if i % 2 == 0 { 1 } else { 3 },
             });
+            objects_list.push(Object {
+                geometry: Geometry::Triangle {
+                    ax: (i % 10) as f32,
+                    ay: 2.0,
+                    az: (i / 10) as f32 + 1.0,
+                    bx: (i % 10) as f32 + 1.0,
+                    by: 2.0,
+                    bz: (i / 10) as f32,
+                    cx: (i % 10) as f32,
+                    cy: 2.0,
+                    cz: (i / 10) as f32,
+                    _padding: Default::default(),
+                },
+                material: if i % 2 == 0 { 1 } else { 3 },
+            });
         }
 
         let objects_list = ObjectList::from_vec(&device, objects_list, "Object".to_owned());

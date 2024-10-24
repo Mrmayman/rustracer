@@ -37,15 +37,15 @@ fn degrees_to_radians(degrees: f32) -> f32 {
 struct Object {
     material: u32,
     object_id: u32,
-    _1: f32, // Sphere.x
-    _2: f32, // Sphere.y
-    _3: f32, // Sphere.z
-    _4: f32, // Sphere.radius
-    _5: f32,
-    _6: f32,
-    _7: f32,
-    _8: f32,
-    _9: f32,
+    _1: f32, // Sphere.x      tri.ax
+    _2: f32, // Sphere.y      tri.ay
+    _3: f32, // Sphere.z      tri.az
+    _4: f32, // Sphere.radius tri.bx
+    _5: f32, //               tri.by
+    _6: f32, //               tri.bz
+    _7: f32, //               tri.cx
+    _8: f32, //               tri.cy
+    _9: f32, //               tri.cz
     _10: f32,
     _11: f32,
     _12: f32,
@@ -311,6 +311,16 @@ fn world_hit(ray: Ray, ray_t: Interval, hit_record: ptr<function, HitRecord>) ->
             let circle_radius = object._4;
             let material = object.material;
             if sphere_hit(material, circle_pos, circle_radius, ray, Interval(ray_t.min, closest_so_far), &temp_rec) {
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                (*hit_record) = temp_rec;
+            }
+        } else if object.object_id == obj_id_triangle {
+            let v1 = vec3<f32>(object._1, object._2, object._3);
+            let v2 = vec3<f32>(object._4, object._5, object._6);
+            let v3 = vec3<f32>(object._7, object._8, object._9);
+            let material = object.material;
+            if triangle_hit(material, v1, v2, v3, ray, Interval(ray_t.min, closest_so_far), &temp_rec) {
                 hit_anything = true;
                 closest_so_far = temp_rec.t;
                 (*hit_record) = temp_rec;

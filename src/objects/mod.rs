@@ -47,7 +47,19 @@ pub enum Geometry {
         centre_y: f32,
         centre_z: f32,
         radius: f32,
-        _padding: [f32; 16 - 6],
+        _padding: [f32; 16 - (4 + 2)],
+    },
+    Triangle {
+        ax: f32,
+        ay: f32,
+        az: f32,
+        bx: f32,
+        by: f32,
+        bz: f32,
+        cx: f32,
+        cy: f32,
+        cz: f32,
+        _padding: [f32; 16 - (9 + 2)],
     },
 }
 
