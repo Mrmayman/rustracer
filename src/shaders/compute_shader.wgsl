@@ -288,7 +288,7 @@ fn triangle_hit(material: u32, vert0: vec3<f32>, vert1: vec3<f32>, vert2: vec3<f
     }
 
     // Update hit record
-    let hrec = (*hit_record);
+    var hrec = (*hit_record);
     hrec.t = t;
     hrec.point = ray_at(ray, t);
     hrec.material = materials[material];
