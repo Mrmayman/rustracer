@@ -155,7 +155,11 @@ fn hit_record_new() -> HitRecord {
 fn write_pixel(color: vec4<f32>, global_id: vec3<u32>) {
     let scale = u32(data.scale_factor);
     let old_color = textureLoad(texture, vec2<i32>(global_id.xy), 0);
-    textureStore(output_image, vec2<i32>(global_id.xy), (color + (old_color * motion_blur)) / (1.0 + motion_blur));
+    if old_color.x == 0.0 && old_color.y == 0.0 && old_color.z == 0.0 {
+        textureStore(output_image, vec2<i32>(global_id.xy), color);
+    } else {
+        textureStore(output_image, vec2<i32>(global_id.xy), (color + (old_color * motion_blur)) / (1.0 + motion_blur));
+    }
 }
 
 @compute @workgroup_size(8, 8, 1)

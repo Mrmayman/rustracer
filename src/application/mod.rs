@@ -28,20 +28,30 @@ pub struct Application<'a> {
     pub device: Device,
     pub data_buffer_object: Buffer,
     pub data_buffer: DataBuffer,
-    pub texture_bind_group: BindGroup,
+
     pub compute_bind_group: BindGroup,
-    pub texture_bind_group_layout: BindGroupLayout,
     pub compute_bind_group_layout: BindGroupLayout,
-    pub render_pipeline: RenderPipeline,
     pub compute_pipeline: ComputePipeline,
+
+    pub texture_bind_group: BindGroup,
+    pub texture_bind_group_layout: BindGroupLayout,
+    pub render_pipeline: RenderPipeline,
+
+    pub denoise_bind_group: BindGroup,
+    pub denoise_bind_group_layout: BindGroupLayout,
+    pub denoise_pipeline: ComputePipeline,
+
     pub queue: Queue,
+
+    pub denoise_texture: Texture,
+    pub denoise_texture_view: TextureView,
+    pub denoise_sampler: Sampler,
 
     pub texture: Texture,
     pub texture_view: TextureView,
-    pub sampler: Sampler,
+
     pub previous_texture: Texture,
     pub previous_texture_view: TextureView,
-    pub previous_sampler: Sampler,
 
     pub last_frame_time: Instant,
     pub start_time: Instant,

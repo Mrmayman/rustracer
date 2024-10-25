@@ -92,6 +92,24 @@ impl<'a> Application<'a> {
             );
         }
 
+        {
+            puffin::profile_scope!("denoise pass");
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Denoise Pass"),
+                timestamp_writes: None,
+            });
+            compute_pass.set_pipeline(&self.denoise_pipeline);
+            compute_pass.set_bind_group(0, &self.denoise_bind_group, &[]);
+
+            compute_pass.dispatch_workgroups(
+                (self.surface_config.width as f32 / (self.scale_factor * WORKGROUP_SIZE)).ceil()
+                    as u32,
+                (self.surface_config.height as f32 / (self.scale_factor * WORKGROUP_SIZE)).ceil()
+                    as u32,
+                1,
+            );
+        }
+
         // Submit the command buffer
         self.queue.submit(Some(encoder.finish()));
     }

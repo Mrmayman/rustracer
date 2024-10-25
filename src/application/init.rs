@@ -146,6 +146,7 @@ impl<'a> Application<'a> {
         surface.configure(&device, &config);
 
         let mut compute_shader_txt = include_str!("../shaders/raytracer/uniforms.wgsl").to_owned();
+        compute_shader_txt.push_str(include_str!("../shaders/data.wgsl"));
         compute_shader_txt.push_str(include_str!("../shaders/raytracer/rng.wgsl"));
         compute_shader_txt.push_str(include_str!("../shaders/raytracer/interval.wgsl"));
         compute_shader_txt.push_str(include_str!("../shaders/raytracer/vec.wgsl"));
@@ -161,14 +162,80 @@ impl<'a> Application<'a> {
             source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/vertex_shader.wgsl").into()),
         });
 
+        let mut denoise_shader_txt = include_str!("../shaders/data.wgsl").to_owned();
+        denoise_shader_txt.push_str(include_str!(
+            "../shaders/glsl_smart_denoise/glsl_smart_denoise.wgsl"
+        ));
+        denoise_shader_txt.push_str(include_str!("../shaders/denoise_shader.wgsl"));
+
+        let denoise_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Denoise Shader"),
+            source: wgpu::ShaderSource::Wgsl(denoise_shader_txt.into()),
+        });
+
         let fragment_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Fragment Shader"),
             source: wgpu::ShaderSource::Wgsl({
                 let mut frag = include_str!("../shaders/fsr/fsr.wgsl").to_owned();
-                frag.push_str(include_str!("../shaders/denoise/denoise.wgsl"));
+                frag.push_str(include_str!("../shaders/data.wgsl"));
                 frag.push_str(include_str!("../shaders/fragment_shader.wgsl"));
                 frag.into()
             }),
+        });
+
+        let denoise_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Denoise Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::StorageTexture {
+                            access: wgpu::StorageTextureAccess::WriteOnly,
+                            format: wgpu::TextureFormat::Rgba8Unorm,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: wgpu::BufferSize::new(
+                                std::mem::size_of::<DataBuffer>() as wgpu::BufferAddress,
+                            ),
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                ],
+            });
+
+        let denoise_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Denoise Pipeline Layout"),
+                bind_group_layouts: &[&denoise_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let denoise_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("Denoise Pipeline"),
+            layout: Some(&denoise_pipeline_layout),
+            module: &denoise_shader,
+            entry_point: "main",
+            compilation_options: PipelineCompilationOptions::default(),
+            cache: None,
         });
 
         let compute_bind_group_layout =
@@ -365,8 +432,26 @@ impl<'a> Application<'a> {
 
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Texture Sampler"),
+        let denoise_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Denoise Texture"),
+            size: wgpu::Extent3d {
+                width: (config.width as f32 / SCALE_FACTOR) as u32,
+                height: (config.height as f32 / SCALE_FACTOR) as u32,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+        });
+
+        let denoise_texture_view =
+            denoise_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let denoise_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Denoise Texture Sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -394,17 +479,6 @@ impl<'a> Application<'a> {
         let previous_texture_view =
             previous_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let previous_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("Previous Texture Sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
-
         let start_time = Instant::now();
 
         let data_buffer = DataBuffer {
@@ -425,6 +499,25 @@ impl<'a> Application<'a> {
             label: Some("Window Size Buffer"),
             contents: bytemuck::cast_slice(&[data_buffer]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let denoise_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Denoise Bind Group"),
+            layout: &denoise_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&denoise_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: data_buffer_object.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                },
+            ],
         });
 
         let compute_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -468,11 +561,11 @@ impl<'a> Application<'a> {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                    resource: wgpu::BindingResource::TextureView(&denoise_texture_view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
+                    resource: wgpu::BindingResource::Sampler(&denoise_sampler),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
@@ -504,7 +597,6 @@ impl<'a> Application<'a> {
             texture_view,
             compute_bind_group_layout,
             texture_bind_group_layout,
-            sampler,
             last_frame_time: Instant::now(),
             start_time,
             data_buffer,
@@ -517,7 +609,12 @@ impl<'a> Application<'a> {
             time_elapsed: 1.0,
             previous_texture_view,
             previous_texture,
-            previous_sampler,
+            denoise_bind_group,
+            denoise_bind_group_layout,
+            denoise_pipeline,
+            denoise_texture,
+            denoise_texture_view,
+            denoise_sampler,
         }
     }
 }

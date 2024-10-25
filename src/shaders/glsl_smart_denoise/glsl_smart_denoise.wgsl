@@ -25,7 +25,9 @@ const INV_PI = 0.31830988618379067153776752674503;
 //      kSigma * sigma  -->  radius of the circular kernel
 //  let threshold   - edge sharpening threshold 
 
-fn smartDeNoise(uv: vec2<f32>, sigma: f32, kSigma: f32, threshold: f32) -> vec4<f32> {
+fn smartDeNoise(uv: vec2<i32>, sigma: f32, kSigma: f32, threshold: f32) -> vec4<f32> {
+    let centrPx: vec4<f32> = textureLoad(texture, uv, 0);
+
     let radius = round(kSigma * sigma);
     let radQ = radius * radius;
 
@@ -35,11 +37,9 @@ fn smartDeNoise(uv: vec2<f32>, sigma: f32, kSigma: f32, threshold: f32) -> vec4<
     let invThresholdSqx2 = .5 / (threshold * threshold);     // 1.0 / (sigma^2 * 2.0)
     let invThresholdSqrt2PI = INV_SQRT_OF_2PI / threshold;   // 1.0 / (sqrt(2*PI) * sigma^2)
 
-    let centrPx: vec4<f32> = textureSample(texture, texture_sampler, uv);
-
     var zBuff = 0.0;
     var aBuff = vec4(0.0);
-    let size = vec2(data.width, data.height) / data.scale_factor;
+    // let size = vec2(data.width, data.height) / data.scale_factor;
 
     var d = vec2<f32>(0.0);
     for (d.x = -radius; d.x <= radius; d.x += 1.0) {
@@ -47,7 +47,8 @@ fn smartDeNoise(uv: vec2<f32>, sigma: f32, kSigma: f32, threshold: f32) -> vec4<
         for (d.y = -pt; d.y <= pt; d.y += 1.0) {
             let blurFactor = exp(-dot(d, d) * invSigmaQx2) * invSigmaQx2PI;
 
-            let walkPx = textureSample(texture, texture_sampler, uv + d / size);
+            let walk_uv = uv + vec2<i32>(d);
+            let walkPx = textureLoad(texture, walk_uv, 0);
             let dC = walkPx - centrPx;
             let deltaFactor = exp(-dot(dC, dC) * invThresholdSqx2) * invThresholdSqrt2PI * blurFactor;
 

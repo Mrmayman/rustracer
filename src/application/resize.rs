@@ -47,6 +47,21 @@ impl<'a> Application<'a> {
                 usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
                 view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
             });
+
+            self.denoise_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("Denoise Texture"),
+                size: wgpu::Extent3d {
+                    width: scaled_width,
+                    height: scaled_height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8Unorm,
+                usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+            });
         }
 
         self.texture_view = self
@@ -55,6 +70,10 @@ impl<'a> Application<'a> {
 
         self.previous_texture_view = self
             .previous_texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.denoise_texture_view = self
+            .denoise_texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         self.compute_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -98,11 +117,11 @@ impl<'a> Application<'a> {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&self.texture_view),
+                    resource: wgpu::BindingResource::TextureView(&self.denoise_texture_view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    resource: wgpu::BindingResource::Sampler(&self.denoise_sampler),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
@@ -115,6 +134,25 @@ impl<'a> Application<'a> {
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: wgpu::BindingResource::TextureView(&self.previous_texture_view),
+                },
+            ],
+        });
+
+        self.denoise_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Denoise Bind Group"),
+            layout: &self.denoise_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&self.denoise_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: self.data_buffer_object.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&self.texture_view),
                 },
             ],
         });
