@@ -12,6 +12,7 @@ pollster = "0.3"
 bytemuck = { version = "1", features = ["derive"] }
 puffin = "0.19"
 puffin_http = "0.16"
+wavefront_obj = "10.0.0"
 
 [profile.release]
 #debug = true

@@ -10,7 +10,7 @@
 // Samples: Less is faster. Higher samples reduce noise.
 // Each pixel is averaged across multiple rays to smooth out lighting.
 // Recommended: 32 for faster rendering, 64+ for quality.
-const samples = 16;
+const samples = 8;
 // Bounces: Controls the number of light bounces (depth) for reflection and refraction.
 // More bounces improve accuracy but slow down performance.
 // Recommended: 2-4 for basic reflections, higher for complex scenes.

@@ -1,4 +1,8 @@
-use std::{collections::HashSet, sync::Arc, time::Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    time::Instant,
+};
 
 use wgpu::{util::DeviceExt, PipelineCompilationOptions};
 
@@ -67,69 +71,133 @@ impl<'a> Application<'a> {
                     radius: 100.0,
                     _padding: Default::default(),
                 },
-                material: 4,
+                material: 0,
             },
         ];
 
-        for i in 0..100 {
-            objects_list.push(Object {
-                geometry: Geometry::Sphere {
-                    centre_x: (i % 10) as f32,
-                    centre_y: 0.0,
-                    centre_z: -1.0 - (i / 10) as f32,
-                    radius: 0.4,
-                    _padding: Default::default(),
-                },
-                material: if i % 2 == 0 { 1 } else { 3 },
-            });
-            objects_list.push(Object {
-                geometry: Geometry::Triangle {
-                    ax: (i % 10) as f32,
-                    ay: 2.0,
-                    az: (i / 10) as f32 + 1.0,
-                    bx: (i % 10) as f32 + 1.0,
-                    by: 2.0,
-                    bz: (i / 10) as f32,
-                    cx: (i % 10) as f32,
-                    cy: 2.0,
-                    cz: (i / 10) as f32,
-                    _padding: Default::default(),
-                },
-                material: if i % 2 == 0 { 1 } else { 3 },
-            });
+        if false {
+            for i in 0..100 {
+                objects_list.push(Object {
+                    geometry: Geometry::Sphere {
+                        centre_x: (i % 10) as f32,
+                        centre_y: 0.0,
+                        centre_z: -1.0 - (i / 10) as f32,
+                        radius: 0.4,
+                        _padding: Default::default(),
+                    },
+                    material: if i % 2 == 0 { 1 } else { 3 },
+                });
+                objects_list.push(Object {
+                    geometry: Geometry::Triangle {
+                        ax: (i % 10) as f32,
+                        ay: 2.0,
+                        az: (i / 10) as f32 + 1.0,
+                        bx: (i % 10) as f32 + 1.0,
+                        by: 2.0,
+                        bz: (i / 10) as f32,
+                        cx: (i % 10) as f32,
+                        cy: 2.0,
+                        cz: (i / 10) as f32,
+                        _padding: Default::default(),
+                    },
+                    material: if i % 2 == 0 { 1 } else { 3 },
+                });
+            }
         }
+
+        let mut num_tris = 0;
+
+        let mtl =
+            wavefront_obj::mtl::parse(include_str!("../../assets/mazda_rx7_low.mtl")).unwrap();
+
+        let mut materials_map = HashMap::new();
+        let mut mtl_i = 1;
+        for mtl in mtl.materials {
+            println!("mtl read: {}", mtl.name);
+            materials_map.insert(mtl.name.clone(), (mtl_i, mtl));
+            mtl_i += 1;
+        }
+
+        let obj =
+            wavefront_obj::obj::parse(include_str!("../../assets/mazda_rx7_low.obj")).unwrap();
+        for obj in obj.objects {
+            for geom in obj.geometry {
+                println!("mtl: {:?}", geom.material_name);
+                let mtl = if let Some(mtl) = &geom.material_name {
+                    if let Some((mtl_i, _mtl)) = materials_map.get(mtl) {
+                        *mtl_i
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+                for shape in geom.shapes {
+                    // if num_tris > 300 {
+                    //     break;
+                    // }
+                    match shape.primitive {
+                        wavefront_obj::obj::Primitive::Point(_) => todo!(),
+                        wavefront_obj::obj::Primitive::Line(_, _) => todo!(),
+                        wavefront_obj::obj::Primitive::Triangle(
+                            (a, _, _),
+                            (b, _, _),
+                            (c, _, _),
+                        ) => {
+                            let a = obj.vertices.get(a).unwrap();
+                            let b = obj.vertices.get(b).unwrap();
+                            let c = obj.vertices.get(c).unwrap();
+                            num_tris += 1;
+                            if true {
+                                objects_list.push(Object {
+                                    material: mtl,
+                                    geometry: Geometry::Triangle {
+                                        ax: a.x as f32,
+                                        ay: a.y as f32,
+                                        az: a.z as f32,
+                                        bx: b.x as f32,
+                                        by: b.y as f32,
+                                        bz: b.z as f32,
+                                        cx: c.x as f32,
+                                        cy: c.y as f32,
+                                        cz: c.z as f32,
+                                        _padding: Default::default(),
+                                    },
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        println!("Num tris: {num_tris}");
+        // std::process::exit(0);
 
         let objects_list = ObjectList::from_vec(&device, objects_list, "Object".to_owned());
 
-        let materials_list = ObjectList::from_vec(
-            &device,
-            vec![
-                Material::Lambertian {
-                    albedo: [1.0, 0.5, 0.25, 1.0],
+        let mut materials = vec![Material::Lambertian {
+            albedo: [1.0, 0.5, 0.25, 1.0],
+            _padding: Default::default(),
+        }];
+
+        for i in 1..mtl_i {
+            if let Some((_name, (_mtl_i, mtl))) =
+                materials_map.iter().find(|(_name, (m_i, _m))| *m_i == i)
+            {
+                materials.push(Material::Lambertian {
+                    albedo: [
+                        mtl.color_diffuse.r as f32,
+                        mtl.color_diffuse.g as f32,
+                        mtl.color_diffuse.b as f32,
+                        1.0,
+                    ],
                     _padding: Default::default(),
-                },
-                Material::Metal {
-                    albedo: [0.25, 0.5, 1.0, 1.0],
-                    _padding: Default::default(),
-                    fuzziness: 0.5,
-                },
-                Material::Dielectric {
-                    refraction_index: 1.5,
-                    _padding: Default::default(),
-                },
-                Material::Metal {
-                    albedo: [1.0, 0.5, 0.25, 1.0],
-                    _padding: Default::default(),
-                    fuzziness: 0.2,
-                },
-                Material::Metal {
-                    albedo: [0.7, 0.7, 0.7, 1.0],
-                    _padding: Default::default(),
-                    fuzziness: 0.1,
-                },
-            ],
-            "Materials".to_owned(),
-        );
+                });
+            }
+        }
+
+        let materials_list = ObjectList::from_vec(&device, materials, "Materials".to_owned());
 
         let surface_capabilities = surface.get_capabilities(&adapter);
         let surface_format = surface_capabilities.formats[0];
