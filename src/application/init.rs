@@ -53,16 +53,16 @@ impl<'a> Application<'a> {
             //     },
             //     material: 1,
             // },
-            // Object {
-            //     geometry: Geometry::Sphere {
-            //         centre_x: 0.5,
-            //         centre_y: 0.0,
-            //         centre_z: -1.0,
-            //         radius: 0.5,
-            //         _padding: Default::default(),
-            //     },
-            //     material: 2,
-            // },
+            Object {
+                geometry: Geometry::Sphere {
+                    centre_x: 4.0,
+                    centre_y: 1.0,
+                    centre_z: 0.0,
+                    radius: 2.0,
+                    _padding: Default::default(),
+                },
+                material: 0,
+            },
             Object {
                 geometry: Geometry::Sphere {
                     centre_x: 0.0,
@@ -185,13 +185,14 @@ impl<'a> Application<'a> {
             if let Some((_name, (_mtl_i, mtl))) =
                 materials_map.iter().find(|(_name, (m_i, _m))| *m_i == i)
             {
-                materials.push(Material::Lambertian {
+                materials.push(Material::Metal {
                     albedo: [
                         mtl.color_diffuse.r as f32,
                         mtl.color_diffuse.g as f32,
                         mtl.color_diffuse.b as f32,
                         1.0,
                     ],
+                    fuzziness: 0.3,
                     _padding: Default::default(),
                 });
             }

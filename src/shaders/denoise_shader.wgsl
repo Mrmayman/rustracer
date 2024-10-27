@@ -5,17 +5,13 @@
 
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let sigma = 1.0;
+    let sigma = 1.5;
     let ksigma = sigma * 2.0;
 
     let uv = (vec2<f32>(global_id.xy) * data.scale_factor) / vec2<f32>(data.width, data.height);
     let real_uv = vec2<u32>(uv * vec2<f32>(data.width, data.height) / data.scale_factor);
     let color = smartDeNoise(vec2<i32>(global_id.xy), sigma, ksigma, 0.195);
     // let color = textureLoad(texture, vec2<i32>(global_id.xy), 0);
-
-    // let real_uv = vec2<i32>(i32(uv.x * data.width / data.scale_factor), i32(uv.y * data.height / data.scale_factor));
-    // let color: vec4<f32> = textureLoad(texture, real_uv, 0);
-    // let color = vec4<f32>(f32(u32(global_id.x) - real_uv.x), 0.0, 0.0, 1.0);
 
     textureStore(output_image, vec2<i32>(global_id.xy), color);
 }
