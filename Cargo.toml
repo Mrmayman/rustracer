@@ -1,22 +1,2 @@
-[package]
-name = "rustracer_v3"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-winit = "0.29"
-wgpu = "22"
-pollster = "0.3"
-bytemuck = { version = "1", features = ["derive"] }
-puffin = "0.19"
-puffin_http = "0.16"
-wavefront_obj = "10.0.0"
-
-[profile.release]
-#debug = true
-
-[profile.dev.package."*"]
-opt-level = 1
-debug = false
+[workspace]
+members = [ "rst_render","rustracer"]

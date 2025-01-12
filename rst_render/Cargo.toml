@@ -1,0 +1,11 @@
+[package]
+name = "rst_render"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+winit = "0.29"
+wgpu = "22"
+bytemuck = { version = "1", features = ["derive"] }
+puffin = "0.19"
+puffin_http = "0.16"

@@ -1,4 +1,4 @@
-use std::{collections::HashSet, time::Instant};
+use std::time::Instant;
 
 use wgpu::{
     BindGroup, BindGroupLayout, Buffer, ComputePipeline, Device, Queue, RenderPipeline, Sampler,
@@ -13,10 +13,9 @@ mod update;
 pub use data_buffer::DataBuffer;
 pub use update::WORKGROUP_SIZE;
 
-use winit::keyboard::KeyCode;
+use crate::objects::{material::Material, BoundingBox, ObjectList, Triangle};
 
-use crate::objects::{material::Material, Object, ObjectList};
-
+#[derive(Clone)]
 pub enum LookDirection {
     AtPoint(f32, f32, f32),
     InDirection(f32, f32),
@@ -57,12 +56,12 @@ pub struct Application<'a> {
     pub start_time: Instant,
     pub time_elapsed: f64,
 
-    pub objects_list: ObjectList<Object>,
+    pub objects_list: ObjectList<Triangle>,
     pub materials_list: ObjectList<Material>,
+    pub bbox_list: ObjectList<BoundingBox>,
 
     pub camera_pos: [f32; 3],
     pub camera_dir: LookDirection,
     pub scale_factor: f32,
-    pub keys_pressed: HashSet<KeyCode>,
     pub is_mouse_locked: bool,
 }

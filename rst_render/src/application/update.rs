@@ -3,13 +3,7 @@ use super::Application;
 pub const WORKGROUP_SIZE: f32 = 8.0;
 
 impl<'a> Application<'a> {
-    pub fn tick(&mut self) {
-        puffin::profile_function!();
-        // TODO: Game ticking logic here.
-        self.render();
-    }
-
-    fn render(&mut self) {
+    pub fn render(&mut self) {
         puffin::profile_function!();
         self.run_compute_shader();
         self.copy_texture_to_screen();

@@ -76,40 +76,7 @@ impl<'a> Application<'a> {
             .denoise_texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        self.compute_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Compute Bind Group"),
-            layout: &self.compute_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&self.texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: self.data_buffer_object.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: self.objects_list.object_len.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: self.objects_list.object_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: self.materials_list.object_len.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 5,
-                    resource: self.materials_list.object_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 6,
-                    resource: wgpu::BindingResource::TextureView(&self.previous_texture_view),
-                },
-            ],
-        });
+        self.update_compute_bind_group();
 
         self.texture_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Texture Bind Group"),
@@ -160,6 +127,51 @@ impl<'a> Application<'a> {
         self.data_buffer.width = self.surface_config.width as f32;
         self.data_buffer.height = self.surface_config.height as f32;
         self.update_data_buffer();
+    }
+
+    pub fn update_compute_bind_group(&mut self) {
+        self.compute_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Compute Bind Group"),
+            layout: &self.compute_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&self.texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: self.data_buffer_object.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.objects_list.object_len.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.objects_list.object_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: self.materials_list.object_len.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: self.materials_list.object_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(&self.previous_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: self.bbox_list.object_len.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: self.bbox_list.object_buffer.as_entire_binding(),
+                },
+            ],
+        });
     }
 
     pub fn update_data_buffer(&mut self) {

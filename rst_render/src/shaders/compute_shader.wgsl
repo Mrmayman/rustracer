@@ -9,22 +9,24 @@
 // =======================================
 // Samples: Less is faster. Higher samples reduce noise.
 // Each pixel is averaged across multiple rays to smooth out lighting.
-// Recommended: 32 for faster rendering, 64+ for quality.
-const samples = 4;
+// Recommended: 4 for faster rendering, 16+ for quality.
+const samples = CONF_SAMPLES;
 // Bounces: Controls the number of light bounces (depth) for reflection and refraction.
 // More bounces improve accuracy but slow down performance.
 // Recommended: 2-4 for basic reflections, higher for complex scenes.
-const bounces = 6;
+const bounces = CONF_BOUNCES;
 // Antialiasing: Improves the quality of object edges by smoothing jagged pixels.
 // 1 for On, and 0 for Off.
 // Note: Motion blur On looks better with antialiasing Off.
-const antialiasing = 0;
+const antialiasing = CONF_ANTIALIASING;
 // Motion Blur: Adds motion blur based on camera or object movement, reducing noise.
 // Cuts noise in half when set to 1.0, so:
-//   samples=64, motion_blur=0.0 == samples=32, motion_blur=1.0
-// This improves performance, but motion blur can cause eye strain.
+//   samples=64, motion_blur=0.0
+// is the same as
+//   samples=32, motion_blur=1.0
+// This improves performance DRASTICALLY, but motion blur can cause eye strain.
 // 1 for On, and 0 for Off.
-const motion_blur = 1.0;
+const motion_blur = CONF_MOTION_BLUR.0;
 // =======================================
 
 const infinity: f32 = pow(2.0, 127.0);
@@ -36,21 +38,21 @@ fn degrees_to_radians(degrees: f32) -> f32 {
 
 struct Object {
     material: u32,
-    object_id: u32,
-    _1: f32, // Sphere.x      tri.ax
-    _2: f32, // Sphere.y      tri.ay
-    _3: f32, // Sphere.z      tri.az
-    _4: f32, // Sphere.radius tri.bx
-    _5: f32, //               tri.by
-    _6: f32, //               tri.bz
-    _7: f32, //               tri.cx
-    _8: f32, //               tri.cy
-    _9: f32, //               tri.cz
+    ax: f32,
+    ay: f32,
+    az: f32,
+    bx: f32,
+    by: f32,
+    bz: f32,
+    cx: f32,
+    cy: f32,
+    cz: f32,
     _10: f32,
     _11: f32,
     _12: f32,
     _13: f32,
     _14: f32,
+    _15: f32,
 }
 
 struct Material {
@@ -123,9 +125,6 @@ fn dielectric_reflectance(cosine: f32, refraction_index: f32) -> f32 {
     r0 = r0 * r0;
     return r0 + (1.0 - r0) * pow(1.0 - cosine, 5.0);
 }
-
-const obj_id_sphere: u32 = 0;
-const obj_id_triangle: u32 = 1;
 
 struct Ray {
     origin: vec3<f32>,
@@ -310,25 +309,13 @@ fn world_hit(ray: Ray, ray_t: Interval, hit_record: ptr<function, HitRecord>) ->
 
     for (var i = 0u; i < objects_len; i += 1u) {
         let object = objects[i];
-        if object.object_id == obj_id_sphere {
-            let circle_pos = vec3<f32>(object._1, object._2, object._3);
-            let circle_radius = object._4;
-            let material = object.material;
-            if sphere_hit(material, circle_pos, circle_radius, ray, Interval(ray_t.min, closest_so_far), &temp_rec) {
-                hit_anything = true;
-                closest_so_far = temp_rec.t;
-                (*hit_record) = temp_rec;
-            }
-        } else if object.object_id == obj_id_triangle {
-            let v1 = vec3<f32>(object._1, object._2, object._3);
-            let v2 = vec3<f32>(object._4, object._5, object._6);
-            let v3 = vec3<f32>(object._7, object._8, object._9);
-            let material = object.material;
-            if triangle_hit(material, v1, v2, v3, ray, Interval(ray_t.min, closest_so_far), &temp_rec) {
-                hit_anything = true;
-                closest_so_far = temp_rec.t;
-                (*hit_record) = temp_rec;
-            }
+        let v1 = vec3<f32>(object.ax, object.ay, object.az);
+        let v2 = vec3<f32>(object.bx, object.by, object.bz);
+        let v3 = vec3<f32>(object.cx, object.cy, object.cz);
+        if triangle_hit(object.material, v1, v2, v3, ray, Interval(ray_t.min, closest_so_far), &temp_rec) {
+            hit_anything = true;
+            closest_so_far = temp_rec.t;
+            (*hit_record) = temp_rec;
         }
     }
 
@@ -360,4 +347,3 @@ fn ray_color(primary_ray: Ray, state: ptr<function, u32>) -> vec3<f32> {
 
     return color;
 }
-
