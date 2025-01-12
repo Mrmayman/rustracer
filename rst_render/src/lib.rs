@@ -56,6 +56,9 @@
 //!             antialiasing: false,
 //!             motion_blur: true,
 //!             downscale: 4.0,
+//!             fov: 90.0,
+//!             sky_color_top: [1.0, 1.0, 1.0],
+//!             sky_color_bottom: [0.03, 0.16, 0.26],
 //!         },
 //!     )
 //!     .await
@@ -78,6 +81,11 @@
 //!         frame.set_scale(4.0);
 //!
 //!         frame.is_mouse_locked = false;
+//!
+//!         // There are a lot of other fields you can change
+//!         // You don't have to change all of them every frame
+//!         // (only the ones that need to be changed)
+//!         // as they will be remembered.
 //!
 //!         frame.camera_pos = [0.5, 0.0, 1.0];
 //!         frame.camera_dir = rst_render::LookDirection::AtPoint(0.5, 0.5, 0.0);
@@ -154,6 +162,12 @@ pub struct ShaderConfig {
     ///
     /// Higher is faster, lower is more detailed.
     pub downscale: f32,
+    /// The field of view of the camera.
+    pub fov: f32,
+    /// The color of the sky at the top. (gradient)
+    pub sky_color_top: [f32; 3],
+    /// The color of the sky at the bottom. (gradient)
+    pub sky_color_bottom: [f32; 3],
 }
 
 /// The user-modifiable state of the frame.
@@ -172,6 +186,8 @@ pub struct FrameState {
     pub delta_time: f64,
     /// Whether to exit the application
     pub exit: bool,
+    /// The field of view of the camera
+    pub fov: f32,
     scale: f32,
     scale_changed: bool,
 }
@@ -214,6 +230,10 @@ impl Renderer<'_> {
         materials: &[Material],
         config: ShaderConfig,
     ) -> Result<Self, Error> {
+        if config.fov <= 0.0 || config.fov >= 180.0 {
+            return Err(Error::InvalidFov);
+        }
+
         let refresh_rate = window
             .primary_monitor()
             .map(|monitor| monitor.refresh_rate_millihertz().map(|n| n as f64 / 1000.0))
@@ -259,6 +279,7 @@ impl Renderer<'_> {
                                 exit: false,
                                 scale: self.app.scale_factor,
                                 scale_changed: false,
+                                fov: self.app.data_buffer.fov,
                             };
 
                             let objects = f(&self.window_event_buf, &mut frame_state);
@@ -267,6 +288,7 @@ impl Renderer<'_> {
                             self.app.camera_pos = frame_state.camera_pos;
                             self.app.camera_dir = frame_state.camera_dir;
                             self.app.scale_factor = frame_state.scale;
+                            self.app.data_buffer.fov = frame_state.fov;
                             if frame_state.scale_changed {
                                 self.app.resize_window(self.window.inner_size());
                             }
@@ -291,6 +313,54 @@ impl Renderer<'_> {
 
         self.window_event_buf.clear();
 
+        self.build_bounding_box(objects);
+        self.update_objects_and_bounding_box();
+
+        self.app.render();
+
+        {
+            let x = self.app.surface_config.width as f32 / self.app.scale_factor;
+            let y = self.app.surface_config.height as f32 / self.app.scale_factor;
+            println!(
+                "{:.2} FPS, Resolution: {} x {} ({} x {} workgroups)",
+                1.0 / self.app.time_elapsed,
+                x.ceil(),
+                y.ceil(),
+                (x / WORKGROUP_SIZE).ceil(),
+                (y / WORKGROUP_SIZE).ceil()
+            );
+        }
+
+        let remaining_time = (1.0 / self.refresh_rate) - self.app.time_elapsed;
+        if remaining_time > 0.0 {
+            // println!("Sleep: {:.1}", remaining_time * 1000.0);
+            // std::thread::sleep(std::time::Duration::from_secs_f64(remaining_time));
+        }
+
+        update_mouse_lock(&self.app, &self.window);
+
+        self.app.update_camera();
+        self.app.update_data_buffer();
+        self.window.request_redraw();
+
+        self.app.time_elapsed = self.app.last_frame_time.elapsed().as_secs_f64();
+        self.app.last_frame_time = std::time::Instant::now();
+    }
+
+    fn update_objects_and_bounding_box(&mut self) {
+        if self
+            .app
+            .objects_list
+            .update(&self.app.queue, &self.app.device)
+        {
+            self.app.bbox_list.update(&self.app.queue, &self.app.device);
+            self.app.update_compute_bind_group();
+        } else if self.app.bbox_list.update(&self.app.queue, &self.app.device) {
+            self.app.update_compute_bind_group();
+        }
+    }
+
+    fn build_bounding_box(&mut self, objects: Vec<Vec<Triangle>>) {
         self.app.objects_list.objects.clear();
         self.app.bbox_list.objects.clear();
         for object in objects {
@@ -312,55 +382,6 @@ impl Renderer<'_> {
                 self.app.bbox_list.objects.push(bbox);
             }
         }
-
-        println!(
-            "{} {}",
-            self.app.bbox_list.existing_len,
-            self.app.objects_list.objects.len()
-        );
-        // std::process::exit(0);
-
-        if self
-            .app
-            .objects_list
-            .update(&self.app.queue, &self.app.device)
-        {
-            self.app.bbox_list.update(&self.app.queue, &self.app.device);
-            self.app.update_compute_bind_group();
-        } else if self.app.bbox_list.update(&self.app.queue, &self.app.device) {
-            self.app.update_compute_bind_group();
-        }
-
-        self.app.render();
-
-        {
-            let x = self.app.surface_config.width as f32 / self.app.scale_factor;
-            let y = self.app.surface_config.height as f32 / self.app.scale_factor;
-            println!(
-                "{:.2} FPS, Resolution: {} x {} ({} x {} workgroups)",
-                1.0 / self.app.time_elapsed,
-                x.ceil(),
-                y.ceil(),
-                (x / WORKGROUP_SIZE).ceil(),
-                (y / WORKGROUP_SIZE).ceil()
-            );
-        }
-
-        let remaining_time = (1.0 / self.refresh_rate) - self.app.time_elapsed;
-        if remaining_time > 0.0 {
-            // println!("Sleep: {:.1}", remaining_time * 1000.0);
-            // std::thread::sleep(std::time::Duration::from_secs_f64(remaining_time));
-            // std::thread::sleep(std::time::Duration::from_secs_f64(0.1));
-        }
-
-        update_mouse_lock(&self.app, &self.window);
-
-        self.app.update_camera();
-        self.app.update_data_buffer();
-        self.window.request_redraw();
-
-        self.app.time_elapsed = self.app.last_frame_time.elapsed().as_secs_f64();
-        self.app.last_frame_time = std::time::Instant::now();
     }
 }
 

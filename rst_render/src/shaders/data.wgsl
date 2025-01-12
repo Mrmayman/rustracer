@@ -10,4 +10,11 @@ struct Data {
     lookx: f32,
     looky: f32,
     lookz: f32,
+    fov: f32,
+    sky_color_top_r: f32,
+    sky_color_top_g: f32,
+    sky_color_top_b: f32,
+    sky_color_bottom_r: f32,
+    sky_color_bottom_g: f32,
+    sky_color_bottom_b: f32,
 };

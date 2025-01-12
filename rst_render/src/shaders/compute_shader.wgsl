@@ -182,7 +182,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let camera_center = vec3<f32>(data.camx, data.camy, data.camz);
     let lookat = vec3<f32>(data.lookx, data.looky, data.lookz);
     let focal_length = vec_length(camera_center - lookat);
-    let theta = degrees_to_radians(90.0);
+    let theta = degrees_to_radians(data.fov);
     let h = tan(theta / 2.0);
     let viewport_height = 2.0 * h * focal_length;
 
@@ -382,7 +382,9 @@ fn ray_color(primary_ray: Ray, state: ptr<function, u32>) -> vec3<f32> {
             let unit_direction = vec_unit_vector(ray.direction);
             let t = 0.5 * (unit_direction.y + 1.0);
             // let sky_color = mix(vec3<f32>(0.03, 0.16, 0.26), vec3<f32>(0.0, 0.0, 0.0), t);
-            let sky_color = mix(vec3<f32>(0.03, 0.16, 0.26), vec3<f32>(1.0, 1.0, 1.0), t);
+            let sky_color = mix(
+                vec3<f32>(data.sky_color_bottom_r, data.sky_color_bottom_g, data.sky_color_bottom_b),
+                vec3<f32>(data.sky_color_top_r,    data.sky_color_top_g,    data.sky_color_top_b), t);
             color = (sky_color * attenuation);
             break;
         }

@@ -31,6 +31,9 @@ async fn run(window: Arc<winit::window::Window>, event_loop: EventLoop<()>) {
             antialiasing: false,
             motion_blur: true,
             downscale: 4.0,
+            fov: 90.0,
+            sky_color_top: [1.0, 1.0, 1.0],
+            sky_color_bottom: [0.03, 0.16, 0.26],
         },
     )
     .await
@@ -53,6 +56,11 @@ async fn run(window: Arc<winit::window::Window>, event_loop: EventLoop<()>) {
         frame.set_scale(4.0);
 
         frame.is_mouse_locked = false;
+
+        // There are a lot of other fields you can change
+        // You don't have to change all of them every frame
+        // (only the ones that need to be changed)
+        // as they will be remembered.
 
         frame.camera_pos = [0.5, 0.0, 1.0];
         frame.camera_dir = rst_render::LookDirection::AtPoint(0.5, 0.5, 0.0);

@@ -40,6 +40,10 @@ async fn run(event_loop: EventLoop<()>, window: Arc<winit::window::Window>) {
             antialiasing: false,
             motion_blur: true,
             downscale: 4.0,
+            fov: 90.0,
+            sky_color_top: [1.0, 1.0, 1.0],
+            // sky_color_top: [0.0, 0.0, 0.0],
+            sky_color_bottom: [0.03, 0.16, 0.26],
         },
     )
     .await

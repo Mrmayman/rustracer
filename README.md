@@ -1,7 +1,17 @@
 # Rustracer
-My attempt at a real-time path tracer in Rust and WGPU.
+A real time path tracer in Rust and WGPU.
 
-This is based on the "Ray Tracing In One Weekend" book and its sequel.
+This is based on the "Ray Tracing In One Weekend" book and (partially) its sequel.
+
+My goal is to make a real-time path tracer that can run on low end hardware (integrated graphics).
+
+# Screenshots
+
+Day scene, 160 fps.
+![Screenshot 1](raytracing1.jpeg)
+
+Night scene, 2 fps (darkness requires more samples reducing fps).
+![Screenshot 2](raytracing2.jpeg)
 
 # Controls
 WASD to move around. Space to go up, Left Shift to go down.
@@ -15,41 +25,29 @@ Move your mouse to look around. By default it will be locked. Click to unlock it
 All shaders are in `src/shaders`. The compute shader consists of `shaders/compute_shader.wgsl` and `shaders/raytracer/*`.
 
 # Constants
-If the raytracer is too slow, you can reduce the settings.
-
-In the `src/shaders/compute_shader.wgsl` file you can find a section at the top:
+If the raytracer is too slow, you can reduce the settings in `rustracer/src/main.rs` here:
 
 ```
-// Tweak these settings as per your needs:
-// =======================================
-// Samples: Less is faster. Higher samples give less noise.
-const samples = 64;
-// Bounces: Less is faster. Higher bounces improve reflections.
-const bounces = 4;
-// Antialiasing: Fixes those jagged pixels in the edges of objects.
-const antialiasing = 1;
-// =======================================
+let renderer = rst_render::Renderer::new(
+    window.clone(),
+    &materials,
+    ShaderConfig {
+        samples: 8,
+        bounces: 4,
+        antialiasing: false,
+        motion_blur: true,
+        downscale: 4.0,
+        // ...
 ```
 
-You can edit it to match your hardware. Also, in `src/shaders/fragment_shader.wgsl` you can find:
+You can edit it to match your hardware.
 
-```
-// 1 to use AMD FSR Upscaling, 0 to not use it.
-const use_fsr = 0;
-```
-
-Change it to 1 to use AMD FSR Upscaling (does look blurry though) or 0 to not use FSR.
-
-Additionally, in `src/main.rs` at the top there is a `SCALE_FACTOR` variable.
-
-```
-/// This indicates how much to downscale the image.
-/// 4.0 means it will reduce resolution by 4x (example: from 1080p to 270p).
-/// Higher values are faster but lower resolution.
-const SCALE_FACTOR: f32 = 4.0;
-```
-
-This can provide a major impact to your performance.
+- `samples` is the number of samples per pixel. (2-4 low, 6 medium, 10+ high)
+- `bounces` is the number of bounces per ray. (2-4 low, 6 medium, 10+ high)
+- `antialiasing` is whether to use antialiasing. (true or false)
+- `motion_blur` is whether to use motion blur. (true or false)
+- `downscale` is the amount to downscale the image by.
+  (1.0 is full resolution, 2.0 is half resolution, 4.0 is quarter resolution, etc.)
 
 # Build
 - Install Rust
@@ -58,9 +56,20 @@ This can provide a major impact to your performance.
 - Do `cargo run --release`
 
 # Notes:
+- You can use this as a library by importing `rst_render` in your project.
 - If you find any problem with the code, feel free to contact me or start an issue in the repository.
 - The code may not be the best, I'm still rather inexperienced in programming.
-- ~~You can check out the old (pretty horrible) versions of this in the old_versions folder. There's a README.md there too, for more information.~~ Update: This is no longer the case. Go to commit id `baa1bce68a68b001a8189469274fab3158291cb7` for this.
+- ~~You can check out the old (pretty horrible) versions of this in the old_versions folder. There's a README.md there too, for more information.~~
+  Update: This is no longer the case. Go to commit id `baa1bce68a68b001a8189469274fab3158291cb7` for this.
+
+# To-Do
+- Texture support
+- Noise texture support
+- Hybrid rendering (ray tracing + rasterization)
+- Skyboxes
+- Sky models (procedural)
+- Volumetric rendering (fog, smoke, etc.)
+- Point lights
 
 # Credits
 [_Ray Tracing in One Weekend_](https://raytracing.github.io/books/RayTracingInOneWeekend.html)

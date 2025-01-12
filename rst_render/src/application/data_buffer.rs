@@ -12,4 +12,7 @@ pub struct DataBuffer {
     pub lookx: f32,
     pub looky: f32,
     pub lookz: f32,
+    pub fov: f32,
+    pub sky_color_top: [f32; 3],
+    pub sky_color_bottom: [f32; 3],
 }

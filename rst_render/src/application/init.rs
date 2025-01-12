@@ -448,6 +448,9 @@ impl<'a> Application<'a> {
             lookx: 0.0,
             looky: 0.0,
             lookz: 0.0,
+            fov: shader_config.fov,
+            sky_color_top: shader_config.sky_color_top,
+            sky_color_bottom: shader_config.sky_color_bottom,
         };
 
         let data_buffer_object = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
