@@ -3,7 +3,7 @@ use wgpu::{util::DeviceExt, Buffer};
 pub mod material;
 
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct BoundingBox {
     pub start_idx: u32,
     pub end_idx: u32,
@@ -122,6 +122,21 @@ impl BoundingBox {
         self.expand_to(tri.geometry.bx, tri.geometry.by, tri.geometry.bz);
         self.expand_to(tri.geometry.cx, tri.geometry.cy, tri.geometry.cz);
     }
+
+    pub fn fix(&mut self) {
+        if self.minx == self.maxx {
+            self.minx -= 0.1;
+            self.maxx += 0.1;
+        }
+        if self.miny == self.maxy {
+            self.miny -= 0.1;
+            self.maxy += 0.1;
+        }
+        if self.minz == self.maxz {
+            self.minz -= 0.1;
+            self.maxz += 0.1;
+        }
+    }
 }
 
 #[repr(C)]
@@ -130,6 +145,15 @@ pub struct Triangle {
     pub material: u32,
     pub geometry: Geometry,
     pub _padding: [u32; 16 - (1 + (std::mem::size_of::<Geometry>() / 4))],
+}
+
+impl std::fmt::Debug for Triangle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Triangle")
+            .field("material", &self.material)
+            .field("geometry", &self.geometry)
+            .finish()
+    }
 }
 
 pub fn to_bytes<T: Sized>(s: &T) -> &[u8] {
@@ -155,6 +179,16 @@ pub struct Geometry {
     pub cx: f32,
     pub cy: f32,
     pub cz: f32,
+}
+
+impl std::fmt::Debug for Geometry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Geometry")
+            .field("a", &format!("({}, {}, {})", self.ax, self.ay, self.az))
+            .field("b", &format!("({}, {}, {})", self.bx, self.by, self.bz))
+            .field("c", &format!("({}, {}, {})", self.cx, self.cy, self.cz))
+            .finish()
+    }
 }
 
 pub struct ObjectList<O: Sized + Default> {

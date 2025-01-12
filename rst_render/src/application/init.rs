@@ -4,7 +4,7 @@ use wgpu::{util::DeviceExt, PipelineCompilationOptions};
 
 use crate::{
     objects::{material::Material, ObjectList, Triangle},
-    ShaderConfig, SCALE_FACTOR,
+    ShaderConfig,
 };
 
 use super::{data_buffer::DataBuffer, Application};
@@ -56,10 +56,10 @@ impl<'a> Application<'a> {
             format: surface_format,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::AutoNoVsync,
+            present_mode: wgpu::PresentMode::Immediate,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![surface_format],
-            desired_maximum_frame_latency: 2,
+            desired_maximum_frame_latency: 1,
         };
         surface.configure(&device, &config);
 
@@ -285,7 +285,10 @@ impl<'a> Application<'a> {
             layout: Some(&compute_pipeline_layout),
             module: &compute_shader,
             entry_point: "main",
-            compilation_options: PipelineCompilationOptions::default(),
+            compilation_options: PipelineCompilationOptions {
+                zero_initialize_workgroup_memory: false,
+                ..Default::default()
+            },
             cache: None,
         });
 
@@ -387,8 +390,8 @@ impl<'a> Application<'a> {
         let denoise_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Denoise Texture"),
             size: wgpu::Extent3d {
-                width: (config.width as f32 / SCALE_FACTOR) as u32,
-                height: (config.height as f32 / SCALE_FACTOR) as u32,
+                width: (config.width as f32 / shader_config.downscale) as u32,
+                height: (config.height as f32 / shader_config.downscale) as u32,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -436,7 +439,7 @@ impl<'a> Application<'a> {
         let data_buffer = DataBuffer {
             width: config.width as f32,
             height: config.height as f32,
-            scale_factor: SCALE_FACTOR,
+            scale_factor: shader_config.downscale,
             time_elapsed: start_time.elapsed().as_secs_f32(),
             frame_number: 0,
             camx: 0.0,
@@ -553,7 +556,7 @@ impl<'a> Application<'a> {
             compute_pipeline,
             queue,
             texture,
-            scale_factor: SCALE_FACTOR,
+            scale_factor: shader_config.downscale,
             texture_view,
             bbox_list,
             compute_bind_group_layout,

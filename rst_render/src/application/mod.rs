@@ -15,7 +15,7 @@ pub use update::WORKGROUP_SIZE;
 
 use crate::objects::{material::Material, BoundingBox, ObjectList, Triangle};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum LookDirection {
     AtPoint(f32, f32, f32),
     InDirection(f32, f32),

@@ -36,6 +36,17 @@ fn degrees_to_radians(degrees: f32) -> f32 {
     return degrees * pi / 180.0;
 }
 
+struct Bbox {
+    start_idx: u32,
+    end_idx: u32,
+    ax: f32,
+    ay: f32,
+    az: f32,
+    bx: f32,
+    by: f32,
+    bz: f32,
+}
+
 struct Object {
     material: u32,
     ax: f32,
@@ -71,6 +82,7 @@ struct Material {
 const mat_id_lambertian: u32 = 0;
 const mat_id_metal: u32 = 1;
 const mat_id_dielectric: u32 = 2;
+const mat_id_emissive: u32 = 3;
 
 fn material_scatter(material: Material, r_in: Ray, rec: ptr<function, HitRecord>, attenuation: ptr<function, vec3<f32>>, scattered: ptr<function, Ray>, rng_state: ptr<function, u32>) -> bool {
     let hrec = (*rec);
@@ -230,32 +242,47 @@ fn ray_at(ray: Ray, val: f32) -> vec3<f32> {
     return ray.origin + (val * ray.direction);
 }
 
-fn sphere_hit(material: u32, center: vec3<f32>, radius: f32, ray: Ray, ray_t: Interval, hit_record: ptr<function, HitRecord>) -> bool {
-    let oc = center - ray.origin;
-    let a = vec_length_squared(ray.direction);
-    let h = dot(ray.direction, oc);
-    let c = vec_length_squared(oc) - radius * radius;
-    let discriminant = h * h - a * c;
+fn aabb_hit(ray: Ray, ray_t2: Interval, min: vec3<f32>, max: vec3<f32>) -> bool {
+    var scaled_min: vec3<f32>;
+    var scaled_max: vec3<f32>;
+    var ray_t = ray_t2;
+    // Scale the AABB by 1.414 in all directions
+    // let center = (min + max) * 0.5;  // Find the center of the AABB
+    // let half_size = (max - min) * 0.5 * 1.414; // Half-size scaled by 1.414
+    // let scaled_min = center - half_size;
+    // let scaled_max = center + half_size;
+    scaled_min = min;
+    scaled_max = max;
 
-    if discriminant < 0.0 {
-        return false;
-    } else {
-        let sqrtd = sqrt(discriminant);
-        var root = (h - sqrtd) / a;
-        if root <= ray_t.min || ray_t.max <= root {
-            root = (h + sqrtd) / a;
-            if root <= ray_t.min || ray_t.max <= root {
-                return false;
+    var t_min = ray_t.min;
+    var t_max = ray_t.max;
+
+    for (var axis = 0u; axis < 3u; axis++) {
+        let inv_dir = 1.0 / ray.direction[axis];
+        var t0 = (scaled_min[axis] - ray.origin[axis]) * inv_dir;
+        var t1 = (scaled_max[axis] - ray.origin[axis]) * inv_dir;
+
+        if t0 < t1 {
+            if t0 > ray_t.min {
+                ray_t.min = t0;
+            }
+            if t1 < ray_t.max {
+                ray_t.max = t1;
+            }
+        } else {
+            if t1 > ray_t.min {
+                ray_t.min = t1;
+            }
+            if t0 < ray_t.max {
+                ray_t.max = t0;
             }
         }
-        var hrec = (*hit_record);
-        hrec.t = root;
-        hrec.point = ray_at(ray, root);
-        hrec.material = materials[material];
 
-        let outward_normal = (hrec.point - center) / radius;
-        (*hit_record) = hit_record_set_face_normal(hrec, ray, outward_normal);
+        if ray_t.max <= ray_t.min {
+            return false;
+        }
     }
+
     return true;
 }
 
@@ -307,15 +334,22 @@ fn world_hit(ray: Ray, ray_t: Interval, hit_record: ptr<function, HitRecord>) ->
     var temp_rec = hit_record_new();
     var closest_so_far = ray_t.max;
 
-    for (var i = 0u; i < objects_len; i += 1u) {
-        let object = objects[i];
-        let v1 = vec3<f32>(object.ax, object.ay, object.az);
-        let v2 = vec3<f32>(object.bx, object.by, object.bz);
-        let v3 = vec3<f32>(object.cx, object.cy, object.cz);
-        if triangle_hit(object.material, v1, v2, v3, ray, Interval(ray_t.min, closest_so_far), &temp_rec) {
-            hit_anything = true;
-            closest_so_far = temp_rec.t;
-            (*hit_record) = temp_rec;
+    for (var bbi = 0u; bbi < 19; bbi += 1u) {
+        let bbox = bboxes[bbi];
+        if aabb_hit(ray, Interval(0.001, infinity), vec3<f32>(bbox.ax, bbox.ay, bbox.az), vec3<f32>(bbox.bx, bbox.by, bbox.bz)) {
+            let start_idx = bbox.start_idx;
+            let end_idx = bbox.end_idx;
+            for (var i = start_idx; i < end_idx; i += 1u) {
+                let object = objects[i];
+                let v1 = vec3<f32>(object.ax, object.ay, object.az);
+                let v2 = vec3<f32>(object.bx, object.by, object.bz);
+                let v3 = vec3<f32>(object.cx, object.cy, object.cz);
+                if triangle_hit(object.material, v1, v2, v3, ray, Interval(ray_t.min, closest_so_far), &temp_rec) {
+                    hit_anything = true;
+                    closest_so_far = temp_rec.t;
+                    (*hit_record) = temp_rec;
+                }
+            }
         }
     }
 
@@ -331,15 +365,22 @@ fn ray_color(primary_ray: Ray, state: ptr<function, u32>) -> vec3<f32> {
         var hit_record = hit_record_new();
         if world_hit(ray, Interval(0.001, infinity), &hit_record) {
             var scattered = Ray(vec3<f32>(0.0), vec3<f32>(0.0));
-            material_scatter(hit_record.material, ray, &hit_record, &attenuation, &scattered, state);
+            var emitted = vec3<f32>(0.0);
+            if hit_record.material.material_id == mat_id_emissive {
+                emitted = vec3<f32>(hit_record.material._1, hit_record.material._2, hit_record.material._3);
+            }
+            if !material_scatter(hit_record.material, ray, &hit_record, &attenuation, &scattered, state) {
+                return emitted;
+            }
             ray = scattered;
+            attenuation += emitted;
             if attenuation.x < bounce_cutoff && attenuation.y < bounce_cutoff && attenuation.z < bounce_cutoff {
                 break;
             }
         } else {
             let unit_direction = vec_unit_vector(ray.direction);
             let t = 0.5 * (unit_direction.y + 1.0);
-            let sky_color = mix(vec3<f32>(1.0, 1.0, 1.0), vec3<f32>(0.5, 0.7, 1.0), t);
+            let sky_color = mix(vec3<f32>(0.03, 0.16, 0.26), vec3<f32>(0.0, 0.0, 0.0), t);
             color = (sky_color * attenuation);
             break;
         }

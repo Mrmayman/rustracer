@@ -30,14 +30,18 @@ async fn run(event_loop: EventLoop<()>, window: Arc<winit::window::Window>) {
     println!("Started application");
     let (materials, objects) = read_model();
 
+    println!("objects = {:#?}", objects);
+    println!("len = {}", objects.len());
+
     let renderer = rst_render::Renderer::new(
         window.clone(),
         &materials,
         ShaderConfig {
-            samples: 2,
-            bounces: 6,
-            antialiasing: true,
+            samples: 16,
+            bounces: 4,
+            antialiasing: false,
             motion_blur: true,
+            downscale: 2.0,
         },
     )
     .await;
@@ -51,7 +55,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<winit::window::Window>) {
 
         move_camera(frame, &keys_pressed);
 
-        vec![objects.clone()]
+        objects.clone()
     });
 }
 
@@ -68,7 +72,9 @@ fn process_event(
                 let dirx = position.x - window_size.width as f64 / 2.0;
                 let diry = position.y - window_size.height as f64 / 2.0;
 
-                let sensitivity = std::cmp::max(window_size.width, window_size.height) as f32;
+                let sensitivity = std::cmp::max(window_size.width, window_size.height) as f32
+                    * frame.delta_time as f32
+                    * 8.0;
 
                 if dirx != 0.0 || diry != 0.0 {
                     if let LookDirection::InDirection(x, y) = &mut frame.camera_dir {
@@ -103,6 +109,11 @@ fn process_event(
 
 fn move_camera(frame: &mut rst_render::FrameState, keys_pressed: &HashSet<KeyCode>) {
     let movement_speed: f32 = frame.delta_time as f32 / 8.0;
+    println!("{:?}, {:?}", frame.camera_pos, frame.camera_dir);
+
+    // frame.camera_pos = [-2.1811569, 1.2047678, 3.2762911];
+    // frame.camera_dir = LookDirection::InDirection(-0.2807544, 36.289806);
+
     if let LookDirection::InDirection(_, roty) = &frame.camera_dir {
         if keys_pressed.contains(&winit::keyboard::KeyCode::KeyW) {
             frame.camera_pos[0] += movement_speed * roty.cos();
@@ -129,50 +140,88 @@ fn move_camera(frame: &mut rst_render::FrameState, keys_pressed: &HashSet<KeyCod
     }
 }
 
-fn read_model() -> (Vec<Material>, Vec<Triangle>) {
-    let mtl = wavefront_obj::mtl::parse(include_str!("../../assets/mazda_rx7_low.mtl")).unwrap();
-
+fn read_model() -> (Vec<Material>, Vec<Vec<Triangle>>) {
     let mut materials_map = HashMap::new();
-    for (i, mtl) in mtl.materials.iter().enumerate() {
-        println!("mtl read: {}", mtl.name);
-        materials_map.insert(mtl.name.clone(), (i as u32, mtl));
+
+    let mut mtl_i = 0;
+    let mtl = wavefront_obj::mtl::parse(include_str!("../../assets/mazda_rx7_mid.mtl")).unwrap();
+    for mtl in &mtl.materials {
+        materials_map.insert(mtl.name.clone(), (mtl_i as u32, mtl));
+        mtl_i += 1;
+    }
+    let mtl = wavefront_obj::mtl::parse(include_str!("../../assets/roadbasic.mtl")).unwrap();
+    for mtl in &mtl.materials {
+        materials_map.insert(mtl.name.clone(), (mtl_i as u32, mtl));
+        mtl_i += 1;
     }
 
     let mut objects_list = Vec::new();
 
-    let obj = wavefront_obj::obj::parse(include_str!("../../assets/mazda_rx7_low.obj")).unwrap();
-    for obj in obj.objects {
-        for geom in &obj.geometry {
-            println!("mtl: {:?}", geom.material_name);
-            let mtl = materials_map
-                .get(geom.material_name.as_ref().unwrap())
-                .unwrap()
-                .0;
-            for shape in &geom.shapes {
-                create_triangle(shape, &obj, &mut objects_list, mtl);
-            }
-        }
-    }
-
+    add_obj(
+        include_str!("../../assets/mazda_rx7_mid.obj"),
+        &materials_map,
+        &mut objects_list,
+    );
+    add_obj(
+        include_str!("../../assets/roadbasic.obj"),
+        &materials_map,
+        &mut objects_list,
+    );
     let mut materials = Vec::new();
 
     for i in 0..materials_map.len() as u32 {
         if let Some((name, (_, mtl))) = materials_map.iter().find(|(_name, (m_i, _m))| *m_i == i) {
-            println!("loaded {name}");
-            materials.push(Material::Metal {
-                albedo: [
-                    mtl.color_diffuse.r as f32,
-                    mtl.color_diffuse.g as f32,
-                    mtl.color_diffuse.b as f32,
-                    1.0,
-                ],
-                fuzziness: 0.3,
-                _padding: Default::default(),
-            });
+            if name == "metal" {
+                materials.push(Material::Emissive {
+                    color: [1.0 * 0.5, 0.8 * 0.5, 0.6 * 0.5, 1.0],
+                    _padding: Default::default(),
+                });
+            } else {
+                materials.push(Material::Metal {
+                    albedo: [
+                        mtl.color_diffuse.r as f32,
+                        mtl.color_diffuse.g as f32,
+                        mtl.color_diffuse.b as f32,
+                        1.0,
+                    ],
+                    fuzziness: mtl.specular_coefficient as f32 / 1000.0,
+                    _padding: Default::default(),
+                });
+            }
         }
     }
 
     (materials, objects_list)
+}
+
+fn add_obj(
+    input: &str,
+    materials_map: &HashMap<String, (u32, &wavefront_obj::mtl::Material)>,
+    objects_list: &mut Vec<Vec<Triangle>>,
+) {
+    let obj = wavefront_obj::obj::parse(input).unwrap();
+    for obj in obj.objects {
+        println!("object: {}", obj.name);
+        let mut list = Vec::new();
+        for geom in &obj.geometry {
+            let mtl = materials_map
+                .get(&geom.material_name.clone().unwrap_or_default())
+                .map(|n| n.0)
+                .unwrap_or(0);
+            for shape in &geom.shapes {
+                create_triangle(shape, &obj, &mut list, mtl);
+            }
+            if list.len() > 10 {
+                println!("list: {}", list.len());
+                objects_list.push(list.clone());
+                list.clear();
+            }
+        }
+
+        if !list.is_empty() {
+            objects_list.push(list);
+        }
+    }
 }
 
 fn create_triangle(

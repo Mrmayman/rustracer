@@ -10,6 +10,6 @@
 @group(0) @binding(6) var texture: texture_2d<f32>;
 
 @group(0) @binding(7) var<uniform> bbox_len: u32;
-@group(0) @binding(8) var<storage, read> bboxes: array<Object>;
+@group(0) @binding(8) var<storage, read> bboxes: array<Bbox>;
 
 const pi: f32 = 3.1415926535897932385;
