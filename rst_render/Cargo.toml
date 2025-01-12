@@ -9,3 +9,9 @@ wgpu = "22"
 bytemuck = { version = "1", features = ["derive"] }
 puffin = "0.19"
 puffin_http = "0.16"
+
+[dev-dependencies]
+pollster = "0.3" # For the example
+
+[[example]]
+name = "triangle"

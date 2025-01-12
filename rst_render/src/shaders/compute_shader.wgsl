@@ -99,7 +99,7 @@ fn material_scatter(material: Material, r_in: Ray, rec: ptr<function, HitRecord>
         return true;
     } else if material.material_id == mat_id_metal {
         var reflected = vec_reflected(r_in.direction, normal);
-        reflected = vec_unit_vector(reflected) + (material._5 * rng_vec_unit_vector(rng_state));
+        reflected = vec_unit_vector(reflected) + (material._4 * rng_vec_unit_vector(rng_state));
         (*scattered) = Ray(point, reflected);
         (*attenuation) *= vec3<f32>(material._1, material._2, material._3);
         return (dot(reflected, normal) > 0);
@@ -125,6 +125,7 @@ fn material_scatter(material: Material, r_in: Ray, rec: ptr<function, HitRecord>
             direction = vec_refract(unit_direction, normal, ri);
         }
 
+        (*attenuation) *= vec3<f32>(material._2, material._3, material._4) * material._5 + (1 - material._5);
         (*scattered) = Ray(point, direction);
         return true;
     } else {
@@ -334,7 +335,7 @@ fn world_hit(ray: Ray, ray_t: Interval, hit_record: ptr<function, HitRecord>) ->
     var temp_rec = hit_record_new();
     var closest_so_far = ray_t.max;
 
-    for (var bbi = 0u; bbi < 19; bbi += 1u) {
+    for (var bbi = 0u; bbi < bbox_len; bbi += 1u) {
         let bbox = bboxes[bbi];
         if aabb_hit(ray, Interval(0.001, infinity), vec3<f32>(bbox.ax, bbox.ay, bbox.az), vec3<f32>(bbox.bx, bbox.by, bbox.bz)) {
             let start_idx = bbox.start_idx;
@@ -380,7 +381,8 @@ fn ray_color(primary_ray: Ray, state: ptr<function, u32>) -> vec3<f32> {
         } else {
             let unit_direction = vec_unit_vector(ray.direction);
             let t = 0.5 * (unit_direction.y + 1.0);
-            let sky_color = mix(vec3<f32>(0.03, 0.16, 0.26), vec3<f32>(0.0, 0.0, 0.0), t);
+            // let sky_color = mix(vec3<f32>(0.03, 0.16, 0.26), vec3<f32>(0.0, 0.0, 0.0), t);
+            let sky_color = mix(vec3<f32>(0.03, 0.16, 0.26), vec3<f32>(1.0, 1.0, 1.0), t);
             color = (sky_color * attenuation);
             break;
         }

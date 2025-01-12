@@ -28,23 +28,22 @@ fn main() {
 
 async fn run(event_loop: EventLoop<()>, window: Arc<winit::window::Window>) {
     println!("Started application");
-    let (materials, objects) = read_model();
 
-    println!("objects = {:#?}", objects);
-    println!("len = {}", objects.len());
+    let (materials, objects) = read_model();
 
     let renderer = rst_render::Renderer::new(
         window.clone(),
         &materials,
         ShaderConfig {
-            samples: 16,
+            samples: 4,
             bounces: 4,
             antialiasing: false,
             motion_blur: true,
-            downscale: 2.0,
+            downscale: 4.0,
         },
     )
-    .await;
+    .await
+    .unwrap();
 
     let mut keys_pressed = HashSet::<KeyCode>::new();
 
@@ -111,8 +110,8 @@ fn move_camera(frame: &mut rst_render::FrameState, keys_pressed: &HashSet<KeyCod
     let movement_speed: f32 = frame.delta_time as f32 / 8.0;
     println!("{:?}, {:?}", frame.camera_pos, frame.camera_dir);
 
-    // frame.camera_pos = [-2.1811569, 1.2047678, 3.2762911];
-    // frame.camera_dir = LookDirection::InDirection(-0.2807544, 36.289806);
+    // frame.camera_pos = [-1.9376986, 1.7867299, 4.8897142];
+    // frame.camera_dir = LookDirection::InDirection(-0.569412, -0.709585);
 
     if let LookDirection::InDirection(_, roty) = &frame.camera_dir {
         if keys_pressed.contains(&winit::keyboard::KeyCode::KeyW) {
@@ -144,7 +143,7 @@ fn read_model() -> (Vec<Material>, Vec<Vec<Triangle>>) {
     let mut materials_map = HashMap::new();
 
     let mut mtl_i = 0;
-    let mtl = wavefront_obj::mtl::parse(include_str!("../../assets/mazda_rx7_mid.mtl")).unwrap();
+    let mtl = wavefront_obj::mtl::parse(include_str!("../../assets/mazda_rx7_low.mtl")).unwrap();
     for mtl in &mtl.materials {
         materials_map.insert(mtl.name.clone(), (mtl_i as u32, mtl));
         mtl_i += 1;
@@ -158,7 +157,7 @@ fn read_model() -> (Vec<Material>, Vec<Vec<Triangle>>) {
     let mut objects_list = Vec::new();
 
     add_obj(
-        include_str!("../../assets/mazda_rx7_mid.obj"),
+        include_str!("../../assets/mazda_rx7_low.obj"),
         &materials_map,
         &mut objects_list,
     );
@@ -170,24 +169,40 @@ fn read_model() -> (Vec<Material>, Vec<Vec<Triangle>>) {
     let mut materials = Vec::new();
 
     for i in 0..materials_map.len() as u32 {
-        if let Some((name, (_, mtl))) = materials_map.iter().find(|(_name, (m_i, _m))| *m_i == i) {
-            if name == "metal" {
-                materials.push(Material::Emissive {
-                    color: [1.0 * 0.5, 0.8 * 0.5, 0.6 * 0.5, 1.0],
-                    _padding: Default::default(),
-                });
-            } else {
-                materials.push(Material::Metal {
-                    albedo: [
+        if let Some((_, (_, mtl))) = materials_map.iter().find(|(_name, (m_i, _m))| *m_i == i) {
+            if let Some(emissive) = mtl.color_emissive {
+                if emissive.r > 0.0 || emissive.g > 0.0 || emissive.b > 0.0 {
+                    materials.push(Material::Emissive {
+                        color: [emissive.r as f32, emissive.g as f32, emissive.b as f32],
+                        _padding: Default::default(),
+                    });
+                    continue;
+                }
+            }
+
+            if mtl.alpha < 1.0 {
+                materials.push(Material::Dielectric {
+                    refraction_index: 1.05,
+                    tint: [
                         mtl.color_diffuse.r as f32,
                         mtl.color_diffuse.g as f32,
                         mtl.color_diffuse.b as f32,
-                        1.0,
                     ],
-                    fuzziness: mtl.specular_coefficient as f32 / 1000.0,
+                    tint_alpha: mtl.alpha as f32,
                     _padding: Default::default(),
                 });
+                continue;
             }
+
+            materials.push(Material::Metal {
+                albedo: [
+                    mtl.color_diffuse.r as f32,
+                    mtl.color_diffuse.g as f32,
+                    mtl.color_diffuse.b as f32,
+                ],
+                fuzziness: mtl.specular_coefficient as f32 / 1000.0,
+                _padding: Default::default(),
+            });
         }
     }
 
@@ -201,7 +216,7 @@ fn add_obj(
 ) {
     let obj = wavefront_obj::obj::parse(input).unwrap();
     for obj in obj.objects {
-        println!("object: {}", obj.name);
+        // println!("object: {}", obj.name);
         let mut list = Vec::new();
         for geom in &obj.geometry {
             let mtl = materials_map
@@ -212,7 +227,7 @@ fn add_obj(
                 create_triangle(shape, &obj, &mut list, mtl);
             }
             if list.len() > 10 {
-                println!("list: {}", list.len());
+                // println!("list: {}", list.len());
                 objects_list.push(list.clone());
                 list.clear();
             }

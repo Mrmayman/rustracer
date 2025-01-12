@@ -3,6 +3,7 @@ use std::{sync::Arc, time::Instant};
 use wgpu::{util::DeviceExt, PipelineCompilationOptions};
 
 use crate::{
+    error::Error,
     objects::{material::Material, ObjectList, Triangle},
     ShaderConfig,
 };
@@ -14,13 +15,13 @@ impl<'a> Application<'a> {
         window: Arc<winit::window::Window>,
         materials: &[Material],
         shader_config: ShaderConfig,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             ..Default::default()
         });
-        let surface = instance.create_surface(window).unwrap();
+        let surface = instance.create_surface(window)?;
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -28,7 +29,7 @@ impl<'a> Application<'a> {
                 force_fallback_adapter: false,
             })
             .await
-            .unwrap();
+            .ok_or(Error::AdapterNotFound)?;
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
@@ -39,8 +40,7 @@ impl<'a> Application<'a> {
                 },
                 None,
             )
-            .await
-            .unwrap();
+            .await?;
 
         let objects_list: ObjectList<Triangle> = ObjectList::new(&device, "Object".to_owned());
 
@@ -545,7 +545,7 @@ impl<'a> Application<'a> {
             ],
         });
 
-        Self {
+        Ok(Self {
             surface,
             surface_config: config,
             device,
@@ -578,6 +578,6 @@ impl<'a> Application<'a> {
             denoise_texture,
             denoise_texture_view,
             denoise_sampler,
-        }
+        })
     }
 }
